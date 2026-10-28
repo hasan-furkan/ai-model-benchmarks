@@ -1,0 +1,15 @@
+[
+  {
+    "id": "2026-10-28-deepseek-v4.1-flash-high-vs-max",
+    "date": "2026-10-28",
+    "title": {
+      "tr": "DeepSeek V4.1 Flash: high ve max düşünme seviyeleri",
+      "en": "DeepSeek V4.1 Flash: high vs max reasoning effort"
+    },
+    "summary": {
+      "tr": "Kodlama işçilerinde varsayılan seviye high olarak kalıyor (HFK kararı, 2026-10-28).",
+      "en": "high stays the default effort for coding workers (decision by HFK, 2026-10-28)."
+    },
+    "path": "2026-10-28-deepseek-v4.1-flash-high-vs-max/"
+  }
+]

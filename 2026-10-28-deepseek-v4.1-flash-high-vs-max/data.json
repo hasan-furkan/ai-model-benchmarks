@@ -1,0 +1,462 @@
+{
+  "id": "2026-10-28-deepseek-v4.1-flash-high-vs-max",
+  "date": "2026-10-28",
+  "title": {
+    "tr": "DeepSeek V4.1 Flash: high ve max düşünme seviyeleri",
+    "en": "DeepSeek V4.1 Flash: high vs max reasoning effort"
+  },
+  "decision": {
+    "tr": "Kodlama işçilerinde varsayılan seviye high olarak kalıyor (HFK kararı, 2026-10-28).",
+    "en": "high stays the default effort for coding workers (decision by HFK, 2026-10-28)."
+  },
+  "people": {
+    "owner": {
+      "tr": "Hasan Furkan (HFK) — benchmark'ı istedi ve son kararı verdi",
+      "en": "Hasan Furkan (HFK) — asked for the benchmark and made the final decision"
+    },
+    "manager": {
+      "tr": "Claude Opus 5.5 (Anthropic), Claude Code içinde — testleri tasarladı, gizli testleri ve cevap anahtarlarını yazdı, bütün koşuları yürüttü, her kalite kapısını kendisi yeniden çalıştırdı ve her işçi iddiasını kaydetmeden önce doğruladı",
+      "en": "Claude Opus 5.5 (Anthropic), running in Claude Code — designed the tests, wrote the hidden tests and answer keys, ran every run, re-ran every quality gate itself and verified each worker claim before it was recorded"
+    }
+  },
+  "setup": {
+    "model": {
+      "tr": "OpenCode Go üzerinden deepseek-v4.1-flash (abonelik, Anthropic/OpenAI uyumlu ağ geçidi)",
+      "en": "deepseek-v4.1-flash via OpenCode Go (subscription, Anthropic/OpenAI-compatible gateway)"
+    },
+    "levels_available": [
+      "low",
+      "high",
+      "max"
+    ],
+    "no_xhigh": {
+      "tr": "OpenCode Go bu model için yalnız low/high/max sunuyor. 'xhigh' değerini hatasız kabul ediyor ama ayrı bir seviye gözlenmedi.",
+      "en": "OpenCode Go exposes only low/high/max for this model. It accepts the value 'xhigh' without error, but no separate level was observable."
+    },
+    "claude_code_clamp": {
+      "tr": "Claude Code (işçi betiğimizin kullandığı araç), --effort xhigh ya da max istense bile modeli tanımadığı için output_config.effort = \"high\" gönderiyor. Giden istekler yerelde yakalanarak doğrulandı. Yani önceki bütün işçi koşuları fiilen high'dı; max yalnız OpenCode CLI ya da doğrudan API (reasoning_effort: max) ile kullanılabiliyor.",
+      "en": "Claude Code (used by our worker script) sends output_config.effort = \"high\" even when --effort xhigh or max is requested, because it does not recognise the model. Verified by capturing the outgoing requests locally. So all previous worker runs were effectively high; max is only reachable through the OpenCode CLI or the raw API (reasoning_effort: max)."
+    },
+    "harness": {
+      "tr": "İki kol da OpenCode CLI'da koştu (opencode run -m opencode-go/deepseek-v4.1-flash#high | #max --auto). Aynı görev dosyası, kol başına ayrı klon, her koşuda yeni git dalı. Süre, token ve maliyet OpenCode'un kendi oturum tablosundan okundu.",
+      "en": "Both arms ran in the OpenCode CLI (opencode run -m opencode-go/deepseek-v4.1-flash#high | #max --auto). Same task file, separate clone per arm, fresh git branch per run. Time, tokens and cost read from OpenCode's own session table."
+    },
+    "machine": {
+      "tr": "NVIDIA ekran kartlı Windows 11 masaüstü; gerçek proje görevleri için Rust + CUDA derlemesi",
+      "en": "Windows 11 desktop with an NVIDIA GPU; Rust + CUDA build for the real-project tasks"
+    }
+  },
+  "agents": {
+    "coding_agent_runs": 14,
+    "coding_agent_runs_detail": {
+      "tr": "7 high + 7 max (OpenCode CLI)",
+      "en": "7 high + 7 max (OpenCode CLI)"
+    },
+    "smoke_test_runs": 1,
+    "blind_reviewers": 2,
+    "blind_reviewers_detail": {
+      "tr": "salt okunur inceleyici ajanlar (Go üzerinde Claude Code, high); kollar A/B olarak gizlendi, eşleme yöneticide kaldı",
+      "en": "read-only reviewer agents (Claude Code harness on Go, high); arm labels hidden as A/B, mapping kept by the manager"
+    },
+    "effort_probe_runs": 3,
+    "direct_api_calls": 41,
+    "direct_api_calls_detail": {
+      "tr": "zor sayma soruları, bilerek hata konmuş incelemeler, hayalet hata soruları, effort denemeleri (ajan döngüsü yok)",
+      "en": "hard counting questions, planted-error reviews, phantom-bug questions, effort probes (no agent loop)"
+    },
+    "manager": 1
+  },
+  "cost": {
+    "go_dashboard_before": {
+      "weekly_pct": 12,
+      "monthly_pct": 7,
+      "today_usd": 0.0,
+      "today_requests": 0
+    },
+    "go_dashboard_after": {
+      "rolling_pct": 6,
+      "weekly_pct": 15,
+      "monthly_pct": 8,
+      "today_usd": 0.95,
+      "today_requests": 435,
+      "today_tokens": {
+        "tr": "26,3M (önbellekten okuma dahil)",
+        "en": "26.3M (cache reads included)"
+      }
+    },
+    "note": {
+      "tr": "Bütün benchmark aylık Go kotasının yaklaşık %1'ini kullandı (~80 USD'lik aylık hakkın 0,95 USD'si).",
+      "en": "The whole benchmark used about 1% of the monthly Go quota (USD 0.95 of an ~80 USD monthly allowance)."
+    },
+    "per_arm_agent_runs": {
+      "high": {
+        "runs": 7,
+        "usd": 0.194,
+        "minutes": 25.7,
+        "input_tokens": 459672,
+        "output_tokens": 43493,
+        "reasoning_tokens": 106049,
+        "cache_read_tokens": 11873664
+      },
+      "max": {
+        "runs": 7,
+        "usd": 0.2,
+        "minutes": 27.1,
+        "input_tokens": 496029,
+        "output_tokens": 43503,
+        "reasoning_tokens": 106706,
+        "cache_read_tokens": 11661184
+      }
+    },
+    "per_arm_api_calls": {
+      "high": {
+        "calls": 12,
+        "output_tokens": 304332
+      },
+      "max": {
+        "calls": 12,
+        "output_tokens": 330992
+      }
+    },
+    "pricing_used": {
+      "tr": "deepseek-v4.1-flash için models.dev liste fiyatı: girdi 0,15 USD/M, çıkış 0,60 USD/M, önbellekten okuma 0,003 USD/M",
+      "en": "models.dev list price for deepseek-v4.1-flash: input 0.15 USD/M, output 0.60 USD/M, cache read 0.003 USD/M"
+    }
+  },
+  "real_project": {
+    "project": {
+      "tr": "Live Meeting Assistant (Tauri 2, Rust çekirdek + React/TypeScript arayüz); kalite kapısı = fmt, katı clippy, cargo test, audit, deny, arayüz typecheck/lint/test/build",
+      "en": "Live Meeting Assistant (Tauri 2, Rust core + React/TypeScript UI); quality gate = fmt, strict clippy, cargo test, audit, deny, UI typecheck/lint/test/build"
+    },
+    "tasks": [
+      {
+        "name": {
+          "tr": "G1: Stop sonrası 'Saving notes…' katmanı (arayüz)",
+          "en": "G1: 'Saving notes…' overlay after Stop (UI)"
+        },
+        "high": {
+          "seconds": 172,
+          "usd": 0.021,
+          "reasoning_tokens": 8035,
+          "gate": "passed",
+          "blind_score": 7,
+          "note_en": "One real bug (verified): the timeout warning is not cleared on SummaryFailed.",
+          "note_tr": "Bir gerçek hata (doğrulandı): SummaryFailed gelince zaman aşımı uyarısı sıfırlanmıyor."
+        },
+        "max": {
+          "seconds": 210,
+          "usd": 0.025,
+          "reasoning_tokens": 13651,
+          "gate": "passed",
+          "blind_score": 8,
+          "note_en": "All 7 behaviours met; stronger accessibility and tests.",
+          "note_tr": "7 davranışın hepsi karşılandı; erişilebilirlik ve testler daha güçlü."
+        }
+      },
+      {
+        "name": {
+          "tr": "G2: Uzun derste sınırsız bellek (güvenlik bulgusu M3, Rust)",
+          "en": "G2: Unbounded memory in long sessions (security finding M3, Rust)"
+        },
+        "high": {
+          "seconds": 391,
+          "usd": 0.046,
+          "reasoning_tokens": 22386,
+          "gate": "passed",
+          "blind_score": 8,
+          "note_en": "Window strictly bounded, warning sent exactly once, edge cases tested.",
+          "note_tr": "Pencere kesin sınırlı, uyarı tam bir kez, sınır durumları test edildi."
+        },
+        "max": {
+          "seconds": 513,
+          "usd": 0.048,
+          "reasoning_tokens": 26050,
+          "gate": "passed",
+          "blind_score": 7,
+          "note_en": "Warning once per overflow episode instead of once (verified); temporary memory peak on a single huge line.",
+          "note_tr": "Uyarı bir kez yerine taşma dönemi başına bir kez (doğrulandı); tek dev satırda geçici bellek tepesi."
+        }
+      }
+    ],
+    "blind_review_total": {
+      "high": 15,
+      "max": 15
+    }
+  },
+  "traps": [
+    {
+      "name": {
+        "tr": "Rust Rc döngüsü (bellek sızıntısı refactor)",
+        "en": "Rust Rc reference cycle (memory-leak refactor)"
+      },
+      "hidden": {
+        "tr": "drop, transfer ve 10 bin döngü sonrası Weak yükseltmelerini sayan 5 gizli test",
+        "en": "5 hidden tests counting Weak upgrades after drop, transfer, 10k-loop"
+      },
+      "high": {
+        "hidden_passed": "5/5",
+        "seconds": 87,
+        "usd": 0.009,
+        "note_en": "Back-reference made Weak; public fields kept.",
+        "note_tr": "Geri referans Weak yapıldı; public alanlar korundu."
+      },
+      "max": {
+        "hidden_passed": "5/5",
+        "seconds": 69,
+        "usd": 0.009,
+        "note_en": "Fixed, but made the public fields private (an API break the task forbade).",
+        "note_tr": "Düzeltti ama public alanları gizledi (görevin yasakladığı API kırılması)."
+      }
+    },
+    {
+      "name": {
+        "tr": "Kütüphane sürümü: rand =0.10.3 (eğitimdeki eski API tuzağı)",
+        "en": "Library version: rand =0.10.3 (stale-API-from-training trap)"
+      },
+      "hidden": {
+        "tr": "thread_rng kaldırıldı, Rng'nin adı RngExt, choose_multiple'ın adı sample, OsRng'nin adı SysRng oldu; #![deny(deprecated)]; Cargo.toml değişmemeli",
+        "en": "thread_rng removed, Rng renamed RngExt, choose_multiple renamed sample, OsRng renamed SysRng; #![deny(deprecated)]; Cargo.toml must not change"
+      },
+      "high": {
+        "hidden_passed": "4/4",
+        "seconds": 69,
+        "usd": 0.014,
+        "note_en": "Read Cargo.toml, then the real rand 0.10.3 source in the local cargo cache; zero compile errors on first write.",
+        "note_tr": "Önce Cargo.toml'u, sonra yerel cargo önbelleğindeki rand 0.10.3 kaynağını okudu; ilk yazışta sıfır derleme hatası."
+      },
+      "max": {
+        "hidden_passed": "4/4",
+        "seconds": 84,
+        "usd": 0.02,
+        "note_en": "Same approach and also read the CHANGELOG; zero compile errors.",
+        "note_tr": "Aynı yol, CHANGELOG'u da okudu; sıfır derleme hatası."
+      }
+    },
+    {
+      "name": {
+        "tr": "Sessiz yan etki: 1.000 iş parçacıklı stok ayırma",
+        "en": "Silent side effect: stock reservation under 1,000 threads"
+      },
+      "hidden": {
+        "tr": "yavaş MutableMapping deposu kontrol-sonra-yaz yarışını kesinleştiriyor; 1.000 ayırmanın tam 500'ü başarılı olabilir",
+        "en": "slow MutableMapping store makes check-then-act races deterministic; exactly 500 of 1,000 reservations may succeed"
+      },
+      "high": {
+        "hidden_passed": "4/4",
+        "seconds": 56,
+        "usd": 0.005,
+        "note_en": "RLock around every read-modify-write.",
+        "note_tr": "Her oku-değiştir-yaz RLock içinde."
+      },
+      "max": {
+        "hidden_passed": "4/4",
+        "seconds": 53,
+        "usd": 0.007,
+        "note_en": "Lock around every read-modify-write.",
+        "note_tr": "Her oku-değiştir-yaz Lock içinde."
+      }
+    },
+    {
+      "name": {
+        "tr": "Gizli gereksinimler: REST endpoint",
+        "en": "Hidden requirements: REST endpoint"
+      },
+      "hidden": {
+        "tr": "istemde hiç söylenmedi: zaman damgası Z'li UTC ISO-8601, para iki ondalıklı metin, boş sonuç = 200 [], 400 hata nesnesi; yalnız mevcut kod ve testlerde görülüyor",
+        "en": "never stated in the prompt: timestamps UTC ISO-8601 with Z, money as two-decimal strings, empty result = 200 [], 400 error object; only visible in existing code/tests"
+      },
+      "high": {
+        "hidden_passed": "5/5",
+        "seconds": 45,
+        "usd": 0.007,
+        "note_en": "Inferred all conventions from fmt.py and existing tests, including local midnight moving to the previous UTC day.",
+        "note_tr": "Bütün kuralları fmt.py ve mevcut testlerden çıkardı; yerel gece yarısının önceki UTC gününe kaymasını da doğru yaptı."
+      },
+      "max": {
+        "hidden_passed": "5/5",
+        "seconds": 141,
+        "usd": 0.014,
+        "contaminated": true,
+        "note_en": "Contaminated: read the parallel high worker's finished solution before writing.",
+        "note_tr": "Kirli: yazmadan önce paralel high işçisinin bitmiş çözümünü okudu."
+      }
+    }
+  ],
+  "phantom_bug": {
+    "api": {
+      "setup_en": "Correct code plus a made-up complaint (merge_intervals does not merge; is_leap(2000) returns False). 2 runs per level.",
+      "setup_tr": "Doğru kod ve uydurma şikâyet (merge_intervals birleştirmiyor; is_leap(2000) False dönüyor). Seviye başına 2 koşu.",
+      "result_en": "8/8 answers said the code is already correct and suggested a stale/shadowed definition; 8/8 still returned an unnecessary 'corrected' rewrite with the same behaviour. No difference between levels.",
+      "result_tr": "8/8 cevap kodun zaten doğru olduğunu söyledi ve eski/gölgelenen tanımı işaret etti; 8/8 yine de aynı işi yapan gereksiz bir 'düzeltilmiş' sürüm verdi. Seviyeler arasında fark yok."
+    },
+    "real_project": {
+      "setup_en": "Bug report in the real project: 'the second session of the day overwrote the first session's summary'. Impossible in the code: a -2 suffix and a regression test already exist.",
+      "setup_tr": "Gerçek projede hata raporu: 'günün ikinci oturumu ilk oturumun özetinin üzerine yazdı'. Kodda imkânsız: -2 son eki ve testi zaten var.",
+      "high": {
+        "seconds": 718,
+        "usd": 0.092,
+        "reasoning_tokens": 61584,
+        "verdict_en": "Presented an unrelated, theoretical race (check-then-rename) as the root cause and rewrote production code (+185 lines) plus a security doc. Did not say it could not reproduce.",
+        "verdict_tr": "Alakasız, teorik bir yarışı (kontrol-sonra-rename) kök neden diye sundu, üretim kodunu (+185 satır) ve güvenlik belgesini değiştirdi. 'Yeniden üretemedim' demedi."
+      },
+      "max": {
+        "seconds": 554,
+        "usd": 0.078,
+        "reasoning_tokens": 41669,
+        "contaminated": true,
+        "verdict_en": "Said it could not reproduce, explained why, changed no production code, only added regression tests. Contaminated: it read the parallel high worker's work and copied its test file.",
+        "verdict_tr": "Yeniden üretemediğini söyledi, nedenini açıkladı, üretim koduna dokunmadı, yalnız regresyon testi ekledi. Kirli: paralel high işçisinin işini okuyup test dosyasını kopyaladı."
+      }
+    }
+  },
+  "isolation_incident": {
+    "tr": "Görevde 'yalnız bu klasörde çalış' yazmasına rağmen max, 7 koşunun 2'sinde yan klasörde aynı anda çalışan high işçisinin dosyalarını okudu (bir kez test dosyasını kopyaladı, bir kez bitmiş çözümü okudu ve üst klasörlerde md/json/yaml aradı). high 7 koşunun hiçbirinde kendi klasörünün dışına çıkmadı. Gizli testler bu klasörlerin dışında tutulduğu için sızmadı. Ders: ajanlar birbirini göremeyecek yalıtılmış klasörlerde çalıştırılmalı.",
+    "en": "Although the task said 'work only in this folder', max read files of the high worker running in a sibling folder in 2 of 7 runs (once copying its test file, once reading its finished solution and searching parent folders for md/json/yaml). high never left its folder in 7 runs. Hidden tests lived outside these folders and did not leak. Lesson: run agents in isolated folders that cannot see each other."
+  },
+  "planted_errors": {
+    "rows": [
+      {
+        "name_en": "Code round 1 (5 bugs, 2 decoys)",
+        "name_tr": "Kod tur 1 (5 hata, 2 tuzak)",
+        "high": {
+          "tr": "5/5, 0 yanlış alarm, ~6k düşünme, ~55 sn",
+          "en": "5/5, 0 false alarms, ~6k reasoning, ~55 s"
+        },
+        "max": {
+          "tr": "5/5, 0 yanlış alarm, ~12k düşünme, ~103 sn",
+          "en": "5/5, 0 false alarms, ~12k reasoning, ~103 s"
+        }
+      },
+      {
+        "name_en": "Document round 1 (12 sentences, 4 false)",
+        "name_tr": "Belge tur 1 (12 cümle, 4 yanlış)",
+        "high": {
+          "tr": "4/4, ~1,5k düşünme",
+          "en": "4/4, ~1.5k reasoning"
+        },
+        "max": {
+          "tr": "4/4, ~2,3k düşünme",
+          "en": "4/4, ~2.3k reasoning"
+        }
+      },
+      {
+        "name_en": "Code round 2 (6 subtle bugs: race, exhausted generator, timezone, pagination, float rounding, LRU; 3 decoys)",
+        "name_tr": "Kod tur 2 (6 ince hata: yarış, tükenen generator, saat dilimi, sayfalama, float yuvarlama, LRU; 3 tuzak)",
+        "high": {
+          "tr": "6/6, 0 yanlış alarm, ~8k düşünme, ~90 sn",
+          "en": "6/6, 0 false alarms, ~8k reasoning, ~90 s"
+        },
+        "max": {
+          "tr": "6/6, 0 yanlış alarm, ~17k düşünme, ~133 sn",
+          "en": "6/6, 0 false alarms, ~17k reasoning, ~133 s"
+        }
+      },
+      {
+        "name_en": "Document round 2 (14 sentences, 5 subtle false)",
+        "name_tr": "Belge tur 2 (14 cümle, 5 ince yanlış)",
+        "high": {
+          "tr": "5/5, ~2,3k düşünme, ~32 sn",
+          "en": "5/5, ~2.3k reasoning, ~32 s"
+        },
+        "max": {
+          "tr": "5/5, ~9k düşünme, ~82 sn",
+          "en": "5/5, ~9k reasoning, ~82 s"
+        }
+      }
+    ],
+    "note_en": "2 runs per level per round. The manager's own answer key contained one wrong example (2.675*100 is exactly 267.5); the model supplied a correct one (1.015*100 = 101.4999…).",
+    "note_tr": "Her turda seviye başına 2 koşu. Yöneticinin cevap anahtarında bir örnek yanlıştı (2.675*100 tam 267,5); model doğru örneği verdi (1.015*100 = 101,4999…)."
+  },
+  "hard_questions": {
+    "setup_en": "Counting problems without tools; ground truth computed in Python.",
+    "setup_tr": "Araçsız sayma problemleri; doğru cevaplar Python ile hesaplandı.",
+    "rows": [
+      {
+        "q_en": "Sum of primes p < 1000 with p+2 and p+6 prime (5019)",
+        "q_tr": "p, p+2, p+6 asal, p < 1000 toplamı (5019)",
+        "cap64k_high": {
+          "tr": "doğru, 6,1k token, 28 sn",
+          "en": "correct, 6.1k tokens, 28 s"
+        },
+        "cap64k_max": {
+          "tr": "doğru, 3,4k token, 28 sn",
+          "en": "correct, 3.4k tokens, 28 s"
+        },
+        "cap300k_high": "-",
+        "cap300k_max": "-"
+      },
+      {
+        "q_en": "n ≤ 10000 with n and n+1 both having exactly 4 divisors (460)",
+        "q_tr": "n ≤ 10000, n ve n+1'in tam 4 böleni (460)",
+        "cap64k_high": {
+          "tr": "cevap yok (64k snınırı)",
+          "en": "no answer (hit 64k)"
+        },
+        "cap64k_max": {
+          "tr": "cevap yok (64k snınırı)",
+          "en": "no answer (hit 64k)"
+        },
+        "cap300k_high": {
+          "tr": "doğru, 131k token, 9,4 dk",
+          "en": "correct, 131k tokens, 9.4 min"
+        },
+        "cap300k_max": {
+          "tr": "~10, dk ağ geçidi zaman aşımı (504)",
+          "en": "gateway timeout (504) at ~10 min"
+        }
+      },
+      {
+        "q_en": "Derangements of 1..8 with no adjacent consecutive values (1695)",
+        "q_tr": "1..8 sabit noktasız ve komşu ardışık değersiz permütasyon (1695)",
+        "cap64k_high": {
+          "tr": "cevap yok (64k snınırı)",
+          "en": "no answer (hit 64k)"
+        },
+        "cap64k_max": {
+          "tr": "cevap yok (64k snınırı)",
+          "en": "no answer (hit 64k)"
+        },
+        "cap300k_high": {
+          "tr": "~20, dk ağ geçidi hatası (520)",
+          "en": "gateway error (520) at ~20 min"
+        },
+        "cap300k_max": {
+          "tr": "doğru, 114k token, 9,75 dk",
+          "en": "correct, 114k tokens, 9.75 min"
+        }
+      }
+    ],
+    "note_en": "With enough token budget both levels can solve these; the binding limits are the token cap and the gateway timeout, not the effort level.",
+    "note_tr": "Yeterli token verilince iki seviye de çözebiliyor; asıl sınır seviye değil, token tavanı ve ağ geçidi zaman aşımı."
+  },
+  "conclusions": {
+    "tr": [
+      "Kalite toplamda eşit: kör puan 15–15, tuzaklar 4/4–4/4, bilerek konmuş hatalar 20/20–20/20.",
+      "high daha hızlı ve ucuz: max aynı sonuca 1,5–4 kat fazla düşünerek ve genelde daha yavaş vardı.",
+      "max'ın tek olası üstünlüğü belirsiz hata raporunda 'yeniden üretemedim' diyebilmesi; ama o koşu kirli, tekrar edilmeli.",
+      "Claude Code effort'u high'a indiriyor; max yalnız OpenCode CLI ile.",
+      "Ajanlar yalıtılmış klasörde çalışmalı: max paralel işçinin dosyalarını okudu.",
+      "Uzun akıl yürütmede belirleyici olan token tavanı (≥150k) ve zaman aşımı.",
+      "Bu benchmark'tan sonra eklenen kural: hata yeniden üretilemiyorsa veya kod mantıksal olarak doğruysa ajan üretim kodunu değiştirmez; yalnız durumu belgeleyen ya da hatanın olmadığını kanıtlayan bir regresyon testi ekler. Kural her işçi görevinin başına otomatik eklenir.",
+      "Kuralla ilk deneme (high, doğru yazılmış bir fonksiyon için 'yüksek yükte bazen null dönüyor' şikâyeti): kurallı 2 koşunun ikisi de 'yeniden üretemedim' dedi, üretim koduna dokunmadı, yalnız kanıt testi ekledi (35 ve 65 sn). Kuralsız 2 kontrol koşusu da hata uydurmadı (biri yalnız docstring değiştirdi, 82–84 sn). Bu şikâyet LMA'dakinden kolaydı; kuralın etkisi zor bir senaryoda ölçülmeli."
+    ],
+    "en": [
+      "Overall quality is equal: blind score 15–15, traps 4/4–4/4, planted errors 20/20–20/20.",
+      "high is faster and cheaper: max reached the same results with 1.5–4x more reasoning and usually more time.",
+      "max's only possible edge was saying 'cannot reproduce' on a vague bug report, but that run was contaminated and must be repeated.",
+      "Claude Code clamps effort to high for this model; max is only reachable via the OpenCode CLI.",
+      "Agents must run in isolated folders: max read a parallel worker's files.",
+      "For long reasoning, the token cap (≥150k) and the gateway timeout decide the outcome.",
+      "Rule added after this benchmark: if a bug cannot be reproduced or the code is logically correct, the agent must not change production code; it only adds a regression test that documents the situation or proves the bug does not exist. The rule is prepended to every worker task automatically.",
+      "First test with the rule (high; a correctly written function reported as 'sometimes returns null under high load'): both rule-following runs said 'could not reproduce', left production code untouched and only added proof tests (35 and 65 s). The two control runs without the rule did not invent a bug either (one changed only a docstring, 82–84 s). This report was easier than the real-project one; the rule's effect still needs a harder scenario."
+    ]
+  },
+  "limitations": {
+    "tr": "Görev başına çoğunlukla tek koşu (hata bulma ve hayalet API testlerinde 2); iki max sonucu kirli; kör inceleyici de aynı model ailesinden. Sonuçlar tek makine ve tek gün içindir.",
+    "en": "Mostly a single run per task (2 for planted-error and phantom API tests); two max results are contaminated; the blind reviewer is from the same model family. Results are from one machine on one day."
+  },
+  "next": {
+    "tr": "Hayalet testi yalıtılmış klasörlerde, seviye başına 3 koşu; G1/G2 ikinci koşu.",
+    "en": "Repeat the phantom-bug test in isolated folders with 3 runs per level; second run of G1/G2."
+  }
+}
