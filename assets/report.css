@@ -763,3 +763,16 @@ ul.plain li:last-child {
 thead th, .arm-head, .badge, .badge.dirty, .chosen-tag {
   text-transform: none;
 }
+
+.grid-1 {
+  display: grid;
+  gap: 16px;
+}
+
+/* Higher blind score in a task row. */
+td.win {
+  color: var(--win, #1f9d55);
+  font-weight: 700;
+  background: color-mix(in srgb, #1f9d55 28%, transparent);
+  box-shadow: inset 0 0 0 1px #1f9d55;
+}

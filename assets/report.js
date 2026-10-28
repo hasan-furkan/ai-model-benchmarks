@@ -40,7 +40,7 @@
       dashboardCaption: 'OpenCode Go quota dashboard (manager account)',
       before: 'Before',
       after: 'After',
-      rolling: 'Rolling quota',
+      rolling: 'Short-term quota (rolling window)',
       weekly: 'Weekly quota',
       monthly: 'Monthly quota',
       todayUsd: 'Today, USD',
@@ -124,7 +124,7 @@
       dashboardCaption: 'OpenCode Go kota paneli (yönetici hesabı)',
       before: 'Önce',
       after: 'Sonra',
-      rolling: 'Devingen kota',
+      rolling: 'Kısa süreli kota (kayan pencere)',
       weekly: 'Haftalık kota',
       monthly: 'Aylık kota',
       todayUsd: 'Bugün, $',
@@ -498,17 +498,11 @@
     header.appendChild(el('p', { cls: 'eyebrow', text: L('reportLabel') }));
     header.appendChild(el('h1', { text: t(data.title) }));
     header.appendChild(el('p', { cls: 'meta-line', text: fmtDate(data.date) }));
-
-    var decision = el('div', { cls: 'decision' });
-    decision.appendChild(el('span', { cls: 'label', text: L('decision') }));
-    decision.appendChild(el('p', { text: t(data.decision) }));
-    header.appendChild(decision);
     frag.appendChild(header);
 
     /* who */
     frag.appendChild(sectionTitle(L('whoTitle')));
-    var people = el('div', { cls: 'grid-2' });
-    people.appendChild(personCard(L('owner'), data.people.owner));
+    var people = el('div', { cls: 'grid-1' });
     people.appendChild(personCard(L('manager'), data.people.manager));
     frag.appendChild(people);
 
@@ -545,7 +539,7 @@
     var before = (data.cost && data.cost.go_dashboard_before) || {};
     var after = (data.cost && data.cost.go_dashboard_after) || {};
     frag.appendChild(buildTable(L('dashboardCaption'), [
-      { text: L('rolling') },
+      { text: L('metric') },
       { text: L('before') },
       { text: L('after') }
     ], [
@@ -596,14 +590,23 @@
     if (data.real_project.project) {
       frag.appendChild(el('p', { cls: 'muted small', text: data.real_project.project }));
     }
+    var projectUrl = data.real_project.project_url;
+    if (typeof projectUrl === 'string' && /^https:\/\/github\.com\//.test(projectUrl)) {
+      frag.appendChild(el('p', { cls: 'small' }, [
+        el('a', { text: projectUrl.replace('https://', ''), attrs: { href: projectUrl, rel: 'noopener' } })
+      ]));
+    }
     var realRows = [];
     (data.real_project.tasks || []).forEach(function (task) {
       var arms = [
         { key: 'high', label: 'high', chosen: true },
         { key: 'max', label: 'max', chosen: false }
       ];
+      var scores = { high: Number((task.high || {}).blind_score), max: Number((task.max || {}).blind_score) };
       arms.forEach(function (arm, index) {
         var a = task[arm.key] || {};
+        var other = arm.key === 'high' ? 'max' : 'high';
+        var wins = scores[arm.key] > scores[other];
         var cells = [];
         if (index === 0) {
           /* the task name spans both arm rows; the max row starts at the arm cell */
@@ -614,7 +617,7 @@
         cells.push({ content: fmtUsd(a.usd), cls: 'num' + (arm.chosen ? ' is-chosen' : '') });
         cells.push({ content: fmtInt(a.reasoning_tokens), cls: 'num' + (arm.chosen ? ' is-chosen' : '') });
         cells.push({ content: a.gate === 'passed' ? badgePass(L('passed')) : String(a.gate || '—'), cls: arm.chosen ? 'is-chosen' : '' });
-        cells.push({ content: fmtInt(a.blind_score), cls: 'num' + (arm.chosen ? ' is-chosen' : '') });
+        cells.push({ content: fmtInt(a.blind_score), cls: 'num' + (arm.chosen ? ' is-chosen' : '') + (wins ? ' win' : '') });
         cells.push({ content: t({ tr: a.note_tr, en: a.note_en }), cls: 'small' + (arm.chosen ? ' is-chosen' : '') });
         realRows.push({
           cls: index === 0 ? 'task-start' : '',

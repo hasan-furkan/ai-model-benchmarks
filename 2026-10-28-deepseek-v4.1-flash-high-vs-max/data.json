@@ -181,7 +181,8 @@
     "blind_review_total": {
       "high": 15,
       "max": 15
-    }
+    },
+    "project_url": "https://github.com/hasan-furkan/live-meeting-transcript-with-brain"
   },
   "traps": [
     {

@@ -7,8 +7,8 @@
       "en": "DeepSeek V4.1 Flash: high vs max reasoning effort"
     },
     "summary": {
-      "tr": "Kodlama işçilerinde varsayılan seviye high olarak kalıyor (HFK kararı, 2026-10-28).",
-      "en": "high stays the default effort for coding workers (decision by HFK, 2026-10-28)."
+      "tr": "high ile max: gerçek proje görevleri, tuzaklı görevler, hata bulma, hayalet hata ve zor sorular.",
+      "en": "high vs max: real-project tasks, trap tasks, error finding, phantom bugs and hard questions."
     },
     "path": "2026-10-28-deepseek-v4.1-flash-high-vs-max/"
   }
