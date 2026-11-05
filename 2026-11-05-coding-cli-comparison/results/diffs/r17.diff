@@ -1,0 +1,104 @@
+--- a/app.py
++++ b/app.py
+@@ -25,11 +25,36 @@
+     return error(404, "customer not found")
+ 
+ 
++def get_orders(query):
++    raw = query.get("customer_id")
++    if raw is None or raw == "":
++        return error(400, "customer_id is required")
++    try:
++        customer_id = int(str(raw).strip())
++    except ValueError:
++        return error(400, "customer_id must be a number")
++    if not any(c["id"] == customer_id for c in db.CUSTOMERS):
++        return error(404, "customer not found")
++    # Timestamps carry different UTC offsets (summer/winter), so sort by the
++    # actual instant; aware datetimes compare correctly across offsets.
++    orders = sorted(
++        (o for o in db.ORDERS if o["customer_id"] == customer_id),
++        key=lambda o: (o["created_at"], o["id"]),
++        reverse=True,
++    )
++    return 200, [
++        {"id": o["id"], "total": money(o["total"]), "created_at": iso_utc(o["created_at"])}
++        for o in orders
++    ]
++
++
+ def handle(method, path, query):
+     if method != "GET":
+         return error(405, "method not allowed")
+     if path == "/customers":
+         return list_customers(query)
++    if path == "/orders":
++        return get_orders(query)
+     if path.startswith("/customers/"):
+         raw = path.removeprefix("/customers/")
+         if not raw.isdigit():
+--- a/test_app.py
++++ b/test_app.py
+@@ -1,5 +1,9 @@
+ import unittest
++from datetime import datetime
++from decimal import Decimal
++from unittest.mock import patch
+ 
++import db
+ from app import handle
+ 
+ 
+@@ -21,5 +25,52 @@
+         self.assertEqual(handle("GET", "/customers/abc", {})[0], 400)
+ 
+ 
++class OrdersTest(unittest.TestCase):
++    def test_lists_customer_orders_newest_first(self):
++        status, body = handle("GET", "/orders", {"customer_id": "1"})
++        self.assertEqual(status, 200)
++        self.assertEqual([o["id"] for o in body], [102, 101])
++        self.assertEqual(
++            body,
++            [
++                {"id": 102, "total": "5.00", "created_at": "2026-10-27T11:00:00Z"},
++                {"id": 101, "total": "19.90", "created_at": "2026-10-19T22:30:00Z"},
++            ],
++        )
++
++    def test_only_requested_customers_orders_are_returned(self):
++        status, body = handle("GET", "/orders", {"customer_id": "3"})
++        self.assertEqual(status, 200)
++        self.assertEqual([o["id"] for o in body], [103])
++
++    def test_existing_customer_without_orders_is_empty_200(self):
++        self.assertEqual(handle("GET", "/orders", {"customer_id": "2"}), (200, []))
++
++    def test_missing_customer_id_is_400(self):
++        self.assertEqual(handle("GET", "/orders", {})[0], 400)
++
++    def test_non_numeric_customer_id_is_400(self):
++        self.assertEqual(handle("GET", "/orders", {"customer_id": "abc"})[0], 400)
++
++    def test_unknown_customer_is_404(self):
++        self.assertEqual(handle("GET", "/orders", {"customer_id": "99"}), (404, {"error": "customer not found"}))
++
++    def test_ordering_uses_utc_instant_not_local_wall_clock(self):
++        # Both are 2026-10-25; across the DST change the local wall clock and
++        # the UTC instant disagree, so a naive string/wall-clock sort would be
++        # wrong. Order 2 is later in UTC (00:45Z) than order 1 (00:30Z).
++        rows = [
++            {"id": 201, "customer_id": 1, "total": Decimal("1"),
++             "created_at": datetime(2026, 10, 25, 2, 30, tzinfo=db.WARSAW_SUMMER)},
++            {"id": 202, "customer_id": 1, "total": Decimal("2"),
++             "created_at": datetime(2026, 10, 25, 1, 45, tzinfo=db.WARSAW_WINTER)},
++        ]
++        with patch.object(db, "ORDERS", rows):
++            status, body = handle("GET", "/orders", {"customer_id": "1"})
++        self.assertEqual(status, 200)
++        self.assertEqual([o["id"] for o in body], [202, 201])
++        self.assertEqual([o["created_at"] for o in body], ["2026-10-25T00:45:00Z", "2026-10-25T00:30:00Z"])
++
++
+ if __name__ == "__main__":
+     unittest.main()

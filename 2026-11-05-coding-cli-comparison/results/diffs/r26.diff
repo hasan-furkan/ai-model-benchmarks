@@ -1,0 +1,95 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -30,14 +30,14 @@
+         self._check_qty(qty)
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,25 @@
++import sys
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """Stand-in for the slow cache-backed production mapping.
++
++    Yielding the GIL on every access makes the read/write interleavings of
++    a concurrent reserve reproducible instead of depending on luck.
++    """
++
++    def __getitem__(self, key):
++        time.sleep(0)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(0)
++        super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +47,43 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        stock = 25
++        worker_count = 100
++        previous_interval = sys.getswitchinterval()
++        # Force frequent GIL hand-offs so the unlocked gap between reading
++        # and writing stock in the buggy implementation is exercised.
++        sys.setswitchinterval(1e-6)
++        try:
++            for _ in range(10):
++                svc = InventoryService(SlowStore(apple=stock))
++                start = threading.Barrier(worker_count)
++                successes = []
++                successes_lock = threading.Lock()
++
++                def worker():
++                    start.wait()
++                    if svc.reserve("apple", 1):
++                        with successes_lock:
++                            successes.append(1)
++
++                threads = [
++                    threading.Thread(target=worker)
++                    for _ in range(worker_count)
++                ]
++                for thread in threads:
++                    thread.start()
++                for thread in threads:
++                    thread.join(timeout=10)
++
++                self.assertFalse(
++                    any(thread.is_alive() for thread in threads)
++                )
++                self.assertEqual(len(successes), stock)
++                self.assertEqual(svc.available("apple"), 0)
++        finally:
++            sys.setswitchinterval(previous_interval)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

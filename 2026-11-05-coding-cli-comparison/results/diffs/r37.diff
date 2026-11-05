@@ -1,0 +1,90 @@
+--- a/shop/cart.py
++++ b/shop/cart.py
+@@ -1,5 +1,6 @@
+ """Shopping cart."""
+ from . import utils
++from .money import format_money, tax_for
+ 
+ 
+ class Cart:
+@@ -13,8 +14,8 @@
+         return sum(cents * qty for _, cents, qty in self.lines)
+ 
+     def tax(self):
+-        return round(self.subtotal() * 0.2)
++        return tax_for(self.subtotal())
+ 
+     def summary(self):
+         total = self.subtotal() + self.tax()
+-        return f"{len(self.lines)} items, total {utils.fmt_price(total)}"
++        return f"{len(self.lines)} items, total {format_money(total)}"
+--- a/shop/invoice.py
++++ b/shop/invoice.py
+@@ -1,13 +1,11 @@
+ """Invoice rendering."""
+-from .utils import fmt_price
++from .money import format_money, tax_for
+ 
+ 
+ def render_line(name, cents, currency="USD"):
+-    return f"{name}: {fmt_price(cents, currency)}"
++    return f"{name}: {format_money(cents, currency)}"
+ 
+ 
+ def render_total(cents, currency="USD"):
+-    sign = "-" if cents < 0 else ""
+-    amount = abs(cents)
+-    tax = round(cents * 0.2)
+-    return f"TOTAL {sign}{amount // 100}.{amount % 100:02d} {currency} (tax {fmt_price(tax, currency)})"
++    tax = tax_for(cents)
++    return f"TOTAL {format_money(cents, currency)} (tax {format_money(tax, currency)})"
+--- a/shop/money.py
++++ b/shop/money.py
+@@ -0,0 +1,13 @@
++"""Money formatting and tax helpers."""
++
++
++def format_money(cents, currency="USD"):
++    """Render an integer amount in cents as e.g. ``19.99 USD``."""
++    sign = "-" if cents < 0 else ""
++    cents = abs(cents)
++    return f"{sign}{cents // 100}.{cents % 100:02d} {currency}"
++
++
++def tax_for(cents, rate=0.2):
++    """Return the rounded tax amount in cents for ``cents`` at ``rate``."""
++    return round(cents * rate)
+--- a/shop/notify.py
++++ b/shop/notify.py
+@@ -1,11 +1,11 @@
+ """Customer notifications."""
+-from .utils import fmt_price as price
++from .money import format_money, tax_for
+ 
+ 
+ def refund_message(name, cents):
+-    return f"Hi {name}, we refunded {price(cents)}."
++    return f"Hi {name}, we refunded {format_money(cents)}."
+ 
+ 
+ def receipt_message(name, cents):
+-    tax = round(cents * 0.2)
+-    return f"Hi {name}, you paid {price(cents + tax)} including {price(tax)} tax."
++    tax = tax_for(cents)
++    return f"Hi {name}, you paid {format_money(cents + tax)} including {format_money(tax)} tax."
+--- a/shop/utils.py
++++ b/shop/utils.py
+@@ -1,10 +1,10 @@
+ """Shared helpers."""
++from .money import format_money
+ 
+ 
+ def fmt_price(cents, currency="USD"):
+-    sign = "-" if cents < 0 else ""
+-    cents = abs(cents)
+-    return f"{sign}{cents // 100}.{cents % 100:02d} {currency}"
++    """Backwards-compatible wrapper around :func:`shop.money.format_money`."""
++    return format_money(cents, currency)
+ 
+ 
+ def clamp(value, low, high):

@@ -1,0 +1,166 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,21 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # The check and the write must be one atomic step under the same lock.
++        # The store may be a slow cache-backed mapping, so the lock also has
++        # to cover its reads/writes, not only the local comparison.
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # Read-modify-write under the lock, otherwise concurrent releases
++        # (and reservations) lose updates and the count drifts.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,79 @@
++import threading
++import time
+ import unittest
++from collections.abc import MutableMapping
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(MutableMapping):
++    """Stand-in for the production cache-backed mapping.
++
++    Every access has noticeable latency, which widens any window between a
++    read and the matching write.
++    """
++
++    def __init__(self, data, read_delay=0.002, write_delay=0.002):
++        self._data = dict(data)
++        self._read_delay = read_delay
++        self._write_delay = write_delay
++        self._store_lock = threading.Lock()
++
++    def __getitem__(self, key):
++        time.sleep(self._read_delay)
++        with self._store_lock:
++            return self._data[key]
++
++    def __setitem__(self, key, value):
++        time.sleep(self._write_delay)
++        with self._store_lock:
++            self._data[key] = value
++
++    def __delitem__(self, key):
++        with self._store_lock:
++            del self._data[key]
++
++    def __iter__(self):
++        with self._store_lock:
++            return iter(list(self._data))
++
++    def __len__(self):
++        with self._store_lock:
++            return len(self._data)
++
++
++class TicketLock:
++    """FIFO mutex for the reservation regression test.
++
++    A thread that releases the lock and immediately tries to take it again
++    queues behind every thread already waiting. That mimics an unlucky
++    thread switch on a busy server and exposes non-atomic check-then-write
++    code deterministically.
++    """
++
++    def __init__(self):
++        self._condition = threading.Condition(threading.Lock())
++        self._next_ticket = 0
++        self._now_serving = 0
++
++    def acquire(self):
++        with self._condition:
++            ticket = self._next_ticket
++            self._next_ticket += 1
++            while ticket != self._now_serving:
++                self._condition.wait()
++
++    def release(self):
++        with self._condition:
++            self._now_serving += 1
++            self._condition.notify_all()
++
++    def __enter__(self):
++        self.acquire()
++        return self
++
++    def __exit__(self, exc_type, exc, tb):
++        self.release()
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +101,53 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        initial_stock = 20
++        workers = 40
++        # The slow read gives every worker time to queue on the FIFO lock
++        # before the first reservation can proceed to its write.
++        svc = InventoryService(
++            SlowStore({"apple": initial_stock}, read_delay=0.01, write_delay=0.001)
++        )
++        svc._lock = TicketLock()
++        start = threading.Barrier(workers)
++        successes = []
++        successes_lock = threading.Lock()
++
++        def buy():
++            start.wait()
++            if svc.reserve("apple", 1):
++                with successes_lock:
++                    successes.append(1)
++
++        threads = [threading.Thread(target=buy) for _ in range(workers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        # Exactly the units that existed can be sold; none may be sold twice.
++        self.assertEqual(len(successes), initial_stock)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_release_no_lost_updates(self):
++        initial_stock = 100
++        workers = 20
++        svc = InventoryService(SlowStore({"apple": initial_stock}))
++        start = threading.Barrier(workers)
++
++        def cancel():
++            start.wait()
++            svc.release("apple", 1)
++
++        threads = [threading.Thread(target=cancel) for _ in range(workers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), initial_stock + workers)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

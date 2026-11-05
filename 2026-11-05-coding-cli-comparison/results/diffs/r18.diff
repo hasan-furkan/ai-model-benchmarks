@@ -1,0 +1,170 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -13,7 +13,19 @@
+ 
+     def __init__(self, store: MutableMapping):
+         self.store = store
+-        self._lock = threading.Lock()
++        # Guards _sku_locks only. It is never held while the (slow) store is
++        # touched, so access to one SKU never blocks access to another.
++        self._locks_guard = threading.Lock()
++        self._sku_locks: dict[str, threading.Lock] = {}
++
++    def _lock_for(self, sku) -> threading.Lock:
++        """Return the lock that serialises all accesses to `sku`."""
++        with self._locks_guard:
++            lock = self._sku_locks.get(sku)
++            if lock is None:
++                lock = threading.Lock()
++                self._sku_locks[sku] = lock
++            return lock
+ 
+     @staticmethod
+     def _check_qty(qty) -> None:
+@@ -22,22 +34,23 @@
+ 
+     def available(self, sku: str) -> int:
+         """Units in stock. Unknown SKU -> KeyError."""
+-        with self._lock:
++        with self._lock_for(sku):
+             return int(self.store[sku])
+ 
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
+-        with self._lock:
++        # The check and the write must happen under the same lock, otherwise
++        # two threads can both read the same stock level and both sell it.
++        with self._lock_for(sku):
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        with self._lock_for(sku):
++            self.store[sku] = int(self.store[sku]) + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,72 @@
++import threading
++import time
+ import unittest
++from collections.abc import MutableMapping
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(MutableMapping):
++    """Stand-in for the production cache-backed mapping.
++
++    Every access is deliberately slow, which widens the window between the
++    read and the write of a read-modify-write sequence and makes races
++    reproducible instead of luck-dependent.
++    """
++
++    def __init__(self, data=None, delay=0.001):
++        self._data = dict(data or {})
++        self._delay = delay
++
++    def __getitem__(self, key):
++        time.sleep(self._delay)
++        return self._data[key]
++
++    def __setitem__(self, key, value):
++        time.sleep(self._delay)
++        self._data[key] = value
++
++    def __delitem__(self, key):
++        time.sleep(self._delay)
++        del self._data[key]
++
++    def __iter__(self):
++        return iter(list(self._data))
++
++    def __len__(self):
++        return len(self._data)
++
++
++class PreemptibleInt(int):
++    """An int that briefly yields the GIL when compared.
++
++    Simulates the worker thread being preempted (or waiting on the slow cache)
++    between the "is there enough stock?" check and the write that follows it.
++    """
++
++    def __gt__(self, other):
++        time.sleep(0.002)
++        return int.__gt__(self, other)
++
++
++def run_concurrently(target, count):
++    """Start `count` threads that all begin together; return their exceptions."""
++    start = threading.Barrier(count)
++    errors = []
++
++    def wrapper():
++        try:
++            start.wait(timeout=10)
++            target()
++        except BaseException as exc:  # pragma: no cover - only on failure
++            errors.append(exc)
++
++    threads = [threading.Thread(target=wrapper) for _ in range(count)]
++    for thread in threads:
++        thread.start()
++    for thread in threads:
++        thread.join()
++    return errors
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +94,39 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        """Flash sale: many threads race for the last units of one SKU."""
++        buyers = 32
++        units = 8
++        store = SlowStore({"apple": units})
++        svc = InventoryService(store)
++
++        sold = []
++        sold_lock = threading.Lock()
++
++        def buy():
++            ok = svc.reserve("apple", PreemptibleInt(1))
++            with sold_lock:
++                sold.append(ok)
++
++        errors = run_concurrently(buy, buyers)
++
++        self.assertEqual(errors, [])
++        self.assertEqual(sum(1 for ok in sold if ok), units, "oversold or undersold")
++        self.assertEqual(svc.available("apple"), 0)
++        self.assertGreaterEqual(store["apple"], 0)
++
++    def test_concurrent_release_no_lost_update(self):
++        """Cancellations: concurrent releases must not overwrite each other."""
++        cancellations = 20
++        store = SlowStore({"apple": 0})
++        svc = InventoryService(store)
++
++        errors = run_concurrently(lambda: svc.release("apple", 1), cancellations)
++
++        self.assertEqual(errors, [])
++        self.assertEqual(svc.available("apple"), cancellations)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

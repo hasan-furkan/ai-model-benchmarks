@@ -1,0 +1,115 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,21 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # The read, the decision and the write are one critical section: doing
++        # them under separate lock acquisitions lets two threads read the same
++        # stock level and both sell it (oversell).
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # Read-modify-write must be atomic too, otherwise concurrent
++        # cancellations overwrite each other and stock drifts downwards.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,11 +1,39 @@
++import sys
++import threading
+ import unittest
+ 
+ from inventory import InventoryService
++
++# The races below live in the handful of bytecodes between a lock release and
++# the next lock acquisition, so they only show up when the GIL is handed over
++# often. A short switch interval makes the interleaving reproducible instead of
++# relying on luck; the previous value is restored after every test.
++SWITCH_INTERVAL = 1e-6
++
++
++def run_threads(target, count):
++    """Run `target` in `count` threads released at the same instant."""
++    barrier = threading.Barrier(count)
++
++    def wrapped():
++        barrier.wait()
++        target()
++
++    threads = [threading.Thread(target=wrapped) for _ in range(count)]
++    for thread in threads:
++        thread.start()
++    for thread in threads:
++        thread.join()
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+     def setUp(self):
+         self.svc = InventoryService({"apple": 5})
++        self._switch_interval = sys.getswitchinterval()
++        sys.setswitchinterval(SWITCH_INTERVAL)
++
++    def tearDown(self):
++        sys.setswitchinterval(self._switch_interval)
+ 
+     def test_reserve_and_available(self):
+         self.assertTrue(self.svc.reserve("apple", 3))
+@@ -28,6 +56,42 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        """More buyers than units: the units sold must never exceed the stock."""
++        stock = 1000
++        workers = 20
++        attempts_per_worker = 100  # 2000 attempts for 1000 units
++        svc = InventoryService({"apple": stock})
++        sold = []
++        sold_lock = threading.Lock()
++
++        def sell():
++            mine = 0
++            for _ in range(attempts_per_worker):
++                if svc.reserve("apple", 1):
++                    mine += 1
++            with sold_lock:
++                sold.append(mine)
++
++        run_threads(sell, workers)
++
++        self.assertEqual(sum(sold), stock, "units sold must equal the stock")
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_release_no_drift(self):
++        """Concurrent cancellations must all be counted, none overwritten."""
++        workers = 20
++        releases_per_worker = 50
++        svc = InventoryService({"apple": 0})
++
++        def cancel():
++            for _ in range(releases_per_worker):
++                svc.release("apple", 1)
++
++        run_threads(cancel, workers)
++
++        self.assertEqual(svc.available("apple"), workers * releases_per_worker)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

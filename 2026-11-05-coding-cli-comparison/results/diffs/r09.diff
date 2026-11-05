@@ -1,0 +1,85 @@
+--- a/app.py
++++ b/app.py
+@@ -25,6 +25,22 @@
+     return error(404, "customer not found")
+ 
+ 
++def get_orders(query):
++    raw = query.get("customer_id")
++    if raw is None or not raw.isdigit():
++        return error(400, "customer id must be a number")
++    customer_id = int(raw)
++    rows = sorted(
++        (o for o in db.ORDERS if o["customer_id"] == customer_id),
++        key=lambda o: o["created_at"],
++        reverse=True,
++    )
++    return 200, [
++        {"id": o["id"], "total": money(o["total"]), "created_at": iso_utc(o["created_at"])}
++        for o in rows
++    ]
++
++
+ def handle(method, path, query):
+     if method != "GET":
+         return error(405, "method not allowed")
+@@ -35,4 +51,6 @@
+         if not raw.isdigit():
+             return error(400, "customer id must be a number")
+         return get_customer(int(raw))
++    if path == "/orders":
++        return get_orders(query)
+     return error(404, "not found")
+--- a/test_app.py
++++ b/test_app.py
+@@ -1,5 +1,6 @@
+ import unittest
+ 
++import db
+ from app import handle
+ 
+ 
+@@ -21,5 +22,43 @@
+         self.assertEqual(handle("GET", "/customers/abc", {})[0], 400)
+ 
+ 
++class OrdersTest(unittest.TestCase):
++    def test_orders_for_customer_are_newest_first(self):
++        status, body = handle("GET", "/orders", {"customer_id": "1"})
++        self.assertEqual(status, 200)
++        self.assertEqual(
++            body,
++            [
++                {"id": 102, "total": "5.00", "created_at": "2026-10-27T11:00:00Z"},
++                {"id": 101, "total": "19.90", "created_at": "2026-10-19T22:30:00Z"},
++            ],
++        )
++
++    def test_orders_use_utc_and_money_strings(self):
++        status, body = handle("GET", "/orders", {"customer_id": "3"})
++        self.assertEqual(status, 200)
++        self.assertEqual(
++            body,
++            [{"id": 103, "total": "120.00", "created_at": "2026-09-01T06:15:00Z"}],
++        )
++
++    def test_unknown_customer_has_no_orders(self):
++        self.assertEqual(handle("GET", "/orders", {"customer_id": "99"}), (200, []))
++
++    def test_missing_customer_id_is_400(self):
++        self.assertEqual(handle("GET", "/orders", {})[0], 400)
++
++    def test_bad_customer_id_is_400(self):
++        self.assertEqual(handle("GET", "/orders", {"customer_id": "abc"})[0], 400)
++
++    def test_orders_query_does_not_reorder_source_rows(self):
++        before = [order.copy() for order in db.ORDERS]
++        handle("GET", "/orders", {"customer_id": "1"})
++        self.assertEqual(db.ORDERS, before)
++
++    def test_orders_rejects_non_get(self):
++        self.assertEqual(handle("POST", "/orders", {"customer_id": "1"})[0], 405)
++
++
+ if __name__ == "__main__":
+     unittest.main()

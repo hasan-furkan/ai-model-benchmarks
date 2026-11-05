@@ -1,0 +1,191 @@
+--- a/report.py
++++ b/report.py
+@@ -1,6 +1,19 @@
+ """Weekly revenue report."""
+ import csv
+-from datetime import datetime, timedelta
++from datetime import datetime, timedelta, timezone
++
++
++def _utc_week_start(created_at):
++    """Return the Monday (UTC) of the week containing an ISO 8601 timestamp.
++
++    Timestamps carrying an offset are converted to UTC first; timestamps
++    without an offset are treated as UTC already.
++    """
++    moment = datetime.fromisoformat(created_at)
++    if moment.tzinfo is not None:
++        moment = moment.astimezone(timezone.utc)
++    day = moment.date()
++    return day - timedelta(days=day.weekday())
+ 
+ 
+ def weekly_totals(rows):
+@@ -8,12 +21,31 @@
+ 
+     Returns {week_start date: total cents}.
+     """
++    by_id = {}
++    for row in rows:
++        row_id = row["id"]
++        if row_id not in by_id:
++            by_id[row_id] = row
++
++    def original_sale(row):
++        """Follow refund_of to the original sale row, guarding against cycles."""
++        seen = {row["id"]}
++        current = row
++        while current["refund_of"]:
++            target = by_id.get(current["refund_of"])
++            if target is None or target["id"] in seen:
++                return None
++            seen.add(target["id"])
++            current = target
++        return current
++
+     totals = {}
+     for row in rows:
+-        day = datetime.fromisoformat(row["created_at"]).date()
+-        # Weeks start on Sunday.
+-        week = day - timedelta(days=(day.weekday() + 1) % 7)
+-        amount = abs(int(row["amount_cents"]))
++        if row["status"] == "voided":
++            continue
++        amount = int(row["amount_cents"])
++        sale = original_sale(row) if row["refund_of"] else None
++        week = _utc_week_start(sale["created_at"] if sale is not None else row["created_at"])
+         totals[week] = totals.get(week, 0) + amount
+     return totals
+ 
+--- a/test_report.py
++++ b/test_report.py
+@@ -1,16 +1,127 @@
++import os
++import tempfile
+ import unittest
+ from datetime import date
+ 
+-from report import weekly_totals
++from report import load, weekly_totals, write_csv
++
++
++def row(id_, amount, created_at, status="paid", refund_of=""):
++    return {
++        "id": id_,
++        "status": status,
++        "amount_cents": str(amount),
++        "created_at": created_at,
++        "refund_of": refund_of,
++    }
+ 
+ 
+ class ReportTest(unittest.TestCase):
+     def test_single_sale_midweek(self):
+-        rows = [{"id": "1", "status": "paid", "amount_cents": "1000", "created_at": "2026-03-04T10:00:00+00:00", "refund_of": ""}]
++        rows = [row("1", 1000, "2026-03-04T10:00:00+00:00")]
+         self.assertEqual(sum(weekly_totals(rows).values()), 1000)
+         self.assertEqual(len(weekly_totals(rows)), 1)
+         self.assertIsInstance(next(iter(weekly_totals(rows))), date)
+ 
++    def test_weeks_start_on_monday(self):
++        # 2026-03-01 is a Sunday; 2026-03-02 is a Monday.
++        totals = weekly_totals([
++            row("sun", 100, "2026-03-01T23:59:59+00:00"),
++            row("mon", 200, "2026-03-02T00:00:00+00:00"),
++        ])
++        self.assertEqual(totals, {date(2026, 2, 23): 100, date(2026, 3, 2): 200})
++
++    def test_every_day_of_a_week_maps_to_its_monday(self):
++        days = ["2026-03-0%d" % day for day in range(2, 10)]  # Mon 2 .. Mon 9
++        rows = [row(day, 1, day + "T12:00:00+00:00") for day in days]
++        totals = weekly_totals(rows)
++        self.assertEqual(list(totals), [date(2026, 3, 2), date(2026, 3, 9)])
++        self.assertEqual(totals[date(2026, 3, 2)], 7)   # Mon 2 - Sun 8
++        self.assertEqual(totals[date(2026, 3, 9)], 1)   # next Monday
++
++    def test_offsets_are_converted_to_utc(self):
++        # 2026-03-02T00:30+05:00 is 2026-03-01T19:30 UTC (still the previous week).
++        totals = weekly_totals([row("1", 500, "2026-03-02T00:30:00+05:00")])
++        self.assertEqual(totals, {date(2026, 2, 23): 500})
++
++    def test_offset_can_move_into_the_next_utc_week(self):
++        # 2026-03-01T22:00-05:00 is 2026-03-02T03:00 UTC (Monday).
++        totals = weekly_totals([row("1", 500, "2026-03-01T22:00:00-05:00")])
++        self.assertEqual(totals, {date(2026, 3, 2): 500})
++
++    def test_voided_rows_never_count(self):
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            row("2", 700, "2026-03-03T10:00:00+00:00", status="voided"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 2): 1000})
++
++    def test_refund_reduces_week_of_original_sale(self):
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            row("2", -200, "2026-03-10T09:00:00+00:00", refund_of="1"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 2): 800})
++
++    def test_refund_does_not_land_in_refund_week(self):
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            row("2", -200, "2026-03-10T09:00:00+00:00", refund_of="1"),
++        ])
++        self.assertNotIn(date(2026, 3, 9), totals)
++
++    def test_orphan_refund_reduces_its_own_week(self):
++        totals = weekly_totals([row("9", -150, "2026-03-10T09:00:00+00:00", refund_of="404")])
++        self.assertEqual(totals, {date(2026, 3, 9): -150})
++
++    def test_refund_of_voided_sale_uses_original_week(self):
++        # Rule 2 suppresses the voided sale itself; rule 3 still points the
++        # refund at the sale's week (see ASSUMPTIONS in the report).
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00", status="voided"),
++            row("2", -200, "2026-03-10T09:00:00+00:00", refund_of="1"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 2): -200})
++
++    def test_signed_amounts_are_preserved(self):
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            row("2", -400, "2026-03-03T10:00:00+00:00"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 2): 600})
++
++    def test_refund_chain_reaches_original_sale(self):
++        totals = weekly_totals([
++            row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            row("2", -200, "2026-03-03T10:00:00+00:00", refund_of="1"),
++            row("3", -50, "2026-03-10T09:00:00+00:00", refund_of="2"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 2): 750})
++
++    def test_refund_cycle_does_not_hang(self):
++        totals = weekly_totals([
++            row("1", -100, "2026-03-10T09:00:00+00:00", refund_of="2"),
++            row("2", -100, "2026-03-17T09:00:00+00:00", refund_of="1"),
++        ])
++        self.assertEqual(totals, {date(2026, 3, 9): -100, date(2026, 3, 16): -100})
++
++    def test_sample_matches_finance_rules(self):
++        totals = weekly_totals(load(os.path.join("data", "sample.csv")))
++        self.assertEqual(totals, {date(2026, 3, 2): 1300})
++
++    def test_csv_roundtrip(self):
++        totals = {date(2026, 3, 2): 1300, date(2026, 2, 23): -50}
++        with tempfile.TemporaryDirectory() as td:
++            path = os.path.join(td, "out.csv")
++            write_csv(totals, path)
++            with open(path, encoding="utf-8") as f:
++                self.assertEqual(f.readline().strip(), "week_start,total_cents")
++            loaded = load(path)
++        self.assertEqual(loaded, [
++            {"week_start": "2026-02-23", "total_cents": "-50"},
++            {"week_start": "2026-03-02", "total_cents": "1300"},
++        ])
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

@@ -1,0 +1,74 @@
+[
+ {
+  "label": "X1",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct instant-based (DST-safe) sort with the fullest test set, including a regression test that proves UTC-instant ordering; it honestly disclosed that check.ps1 could only be run with an execution-policy override."
+ },
+ {
+  "label": "X2",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct implementation with a real cross-offset ordering test, but the suite is thin (four tests), imports live inside the test body, and it lacks 405/field-set coverage."
+ },
+ {
+  "label": "X3",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct instant-based sort and clean tests, but it never exercises the mixed +01:00/+02:00 case the seed data exists to trip."
+ },
+ {
+  "label": "X4",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Core endpoint is correct, but it invents an undocumented 404 for unknown customers and has no cross-offset ordering test."
+ },
+ {
+  "label": "X5",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct and well covered (ten tests including a DST trap with a negative offset and a deterministic id tie-break), with validation kept in the route like the existing style."
+ },
+ {
+  "label": "X6",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct and thorough (ten tests, strict ASCII-digit validation, DST regression, isolated test file), marred only by the same undocumented 404 for unknown customers."
+ },
+ {
+  "label": "X7",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct and non-mutating with a nice non-mutation test, but there is no cross-offset regression test and `raw.isdigit()` would crash on a non-string query value."
+ },
+ {
+  "label": "X8",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct with a DST regression test, but it adds an undocumented 404 and parses leniently via `int(str(raw).strip())`, so '-1'/' 1 ' take a different path than the stated numeric rule."
+ },
+ {
+  "label": "X9",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct minimal implementation, but no cross-offset/DST regression test and `raw.isdigit()` assumes the query value is always a string."
+ }
+]

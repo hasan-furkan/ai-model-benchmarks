@@ -1,0 +1,74 @@
+[
+ {
+  "label": "X1",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct minimal refactor that keeps negative-amount sign handling and rounding identical, with fmt_price left as a thin wrapper and legacy_api/tests untouched; only missing docstrings and any evidence of verification."
+ },
+ {
+  "label": "X2",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Clean, consistently written refactor that removes all fmt_price/inline formatting/literal 0.2 from the three modules, preserves behaviour exactly including signed tax in render_total, and reports verification."
+ },
+ {
+  "label": "X3",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Same correct, behaviour-preserving refactor as X2 with documented differential verification across negative, zero and large amounts."
+ },
+ {
+  "label": "X4",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Code is correct and equivalent to X1 with docstrings, but the definition-of-done command was only run with an execution-policy bypass (disclosed, so not a code problem)."
+ },
+ {
+  "label": "X5",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct and well documented, with utils delegating through the money module so it stays the single source; import style is slightly inconsistent between modules but harmless."
+ },
+ {
+  "label": "X6",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct, but introduces an unrequested DEFAULT_TAX_RATE constant and needlessly reflows notify's return statement, adding churn beyond the refactor."
+ },
+ {
+  "label": "X7",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct, behaviour-preserving refactor identical in effect to the others; verification used an execution-policy override rather than the literal DoD command, which is disclosed."
+ },
+ {
+  "label": "X8",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct and minimal with honest disclosure that the exact check command was blocked by host policy and run with -ExecutionPolicy Bypass."
+ },
+ {
+  "label": "X9",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct, behaviour-preserving refactor with clean imports, docstrings, and documented differential verification including negative signs and multiple currencies."
+ }
+]

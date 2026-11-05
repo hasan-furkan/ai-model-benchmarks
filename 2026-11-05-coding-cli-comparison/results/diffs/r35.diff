@@ -1,0 +1,108 @@
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,26 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """Mimics the production cache-backed mapping: every access pays a delay.
++
++    The delay widens any read-modify-write race window, so a service that is
++    not properly serialized will oversell under this store.
++    """
++
++    delay = 0.0005
++
++    def __getitem__(self, key):
++        time.sleep(self.delay)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(self.delay)
++        super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +48,78 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_never_oversells(self):
++        """Threads racing for the last units must not both win (flash-sale case)."""
++        stock = 10
++        svc = InventoryService(SlowStore({"apple": stock}))
++        granted = []
++        granted_lock = threading.Lock()
++        start = threading.Event()
++
++        def worker():
++            start.wait()
++            ok = svc.reserve("apple", 1)
++            with granted_lock:
++                granted.append(ok)
++
++        threads = [threading.Thread(target=worker) for _ in range(40)]
++        for thread in threads:
++            thread.start()
++        start.set()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(sum(granted), stock)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_reserve_preserves_stock_invariant(self):
++        """Whatever the interleaving, granted units plus remaining stock equal the initial stock."""
++        initial = 50
++        svc = InventoryService(SlowStore({"apple": initial}))
++        granted = []
++        granted_lock = threading.Lock()
++        start = threading.Event()
++
++        def worker(qty):
++            start.wait()
++            if svc.reserve("apple", qty):
++                with granted_lock:
++                    granted.append(qty)
++
++        threads = [
++            threading.Thread(target=worker, args=((i % 5) + 1,)) for i in range(60)
++        ]
++        for thread in threads:
++            thread.start()
++        start.set()
++        for thread in threads:
++            thread.join()
++
++        remaining = svc.available("apple")
++        self.assertGreaterEqual(remaining, 0)
++        self.assertEqual(sum(granted) + remaining, initial)
++
++    def test_concurrent_reserve_and_release_loses_no_units(self):
++        """Reserving then releasing the same units must leave the stock unchanged."""
++        initial = 25
++        svc = InventoryService(SlowStore({"apple": initial}))
++        start = threading.Event()
++
++        def worker():
++            start.wait()
++            for _ in range(5):
++                if svc.reserve("apple", 1):
++                    svc.release("apple", 1)
++
++        threads = [threading.Thread(target=worker) for _ in range(10)]
++        for thread in threads:
++            thread.start()
++        start.set()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), initial)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

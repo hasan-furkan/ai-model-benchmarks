@@ -19,6 +19,7 @@ assets/report.js        shared language switch and page rendering
   index.html            the report page (reads data.json)
   data.json             every number and sentence shown on the page
   kit/                  what the benchmark actually ran
+  results/              raw results, when the report publishes them
 ```
 
 ## What is in a report folder
@@ -81,10 +82,43 @@ scripts/
 
 The task files under `tasks/` were translated from the original Turkish prompts the agents actually received; each file starts with that note. The log-parsing scripts expect the UTF-16 session logs the runner wrote.
 
+### The kit of the coding CLI report (2026-11-05)
+
+```
+tasks/
+  t0.md, t0b.md                      empty task ("reply OK"): fixed overhead of each harness
+  t1.md                              new endpoint: GET /orders, newest first
+  t2.md                              real race condition in a shared stock service
+  t3.md                              refactor money formatting and tax into shop/money.py
+  t4.md                              phantom bug: the code is correct, nothing should change
+  t5.md                              vague "the numbers are off" request with hidden rules
+  blind-review.md                    the blind-review prompt (nine anonymous submissions)
+hidden-tests/
+  t1_hidden.py ... t5_hidden.py      the tests that decide whether a task was solved
+fixtures/
+  t1/ ... t5/                        the small Python projects each run started from
+answer-keys/
+  blind-review-map.json              which anonymous label was which run
+scripts/
+  run-bench.py                       the runner: copies a fixture, starts an arm, records usage
+  score.py                           hidden tests, planted constraints and the gate re-run
+  aggregate.py                       per-arm and per-cell summaries
+  build-fixtures.py                  rebuilds the fixtures from source
+  build-review.py                    builds the anonymous blind-review bundles
+  manifest.json                      the run plan (task, arm, repeat, order)
+  dsh-go.patch.tmpl.yml              the dsh provider config used for Go (no keys)
+```
+
+The results sit next to the kit in `results/`: `runs.json` (per-run metrics, 45 runs plus six empty-task runs), `summary.json`, `blind-review-t1.json` ... `t5.json` and `diffs/r01.diff` ... `r45.diff`. The workers' final messages are not published: some of them are in Turkish, because the shared rules text they received is Turkish.
+
 ## Adding a new report
 
 1. Create a folder named `YYYY-MM-DD-<short-slug>` next to the existing report.
-2. Add `data.json` in that folder, following the shape of an existing one. Every string shown on the page is either a plain string or an object with `tr` and `en` fields; text that has no English version (`people`, `setup`, `agents.*_detail`, `cost.note`, `traps[].hidden`) is shown unchanged in both languages.
+2. Add `data.json` in that folder. Two shapes are supported:
+   - **Generic sections layout** (recommended for new reports): set `"layout": "sections"` and use `title`, `lede`, `people.manager`, `hero` (`label`, `value`, `caption`, `chips[{tone, text}]`), `arms[{key, name, detail, chosen}]`, `decision` and `sections[{id, label, title, lede, blocks[]}]`. Block types: `kv`, `table` (cells are strings, `{tr, en}` or `{v, fmt, best}` with `fmt` one of `usd3`, `usd4`, `int`, `seconds`, `dec2`), `bars`, `rings`, `gauges`, `strip`, `ranges` (inline SVG charts, each with an accessible data table), `tasks`, `list`, `paragraph`, `callout` (`warn` / `info`), `verdicts` and `links` (relative paths only). Unknown block types are skipped. See `2026-11-05-coding-cli-comparison/data.json`.
+   - **The original high/max shape** of `2026-10-28-deepseek-v4.1-flash-high-vs-max/data.json`, kept for that report.
+
+   Every string shown on the page is either a plain string or an object with `tr` and `en` fields; a plain string is shown unchanged in both languages.
 3. Copy `index.html` from an existing report folder — it only loads `../assets/report.css`, `../assets/report.js` and the folder's own `data.json`, so nothing in it is report-specific.
 4. Add one record to `benchmarks.json`:
 
@@ -111,6 +145,7 @@ The task files under `tasks/` were translated from the original Turkish prompts 
 
 - Language: TR | EN switch in the top right. The default follows the browser language (Turkish if it starts with `tr`, English otherwise); the choice is stored in `localStorage` and `<html lang>` follows it.
 - Theme: light and dark, following `prefers-color-scheme`.
+- Design: warm neutral surfaces, one brand colour (pine) and one accent (amber); the verdict comes first in a large focal card, charts are hand-drawn inline SVG with a data table for screen readers, and pages work down to 320 px wide. Motion is off under `prefers-reduced-motion`.
 - In the arm tables the **high** column carries a thin highlight: it is the effort level the project settled on.
 - Contaminated results — a run that read another worker's work — are marked with a visible *contaminated / kirli* badge and are never silently treated as valid.
 - Data is written to the DOM only through `textContent` and `createElement`. `innerHTML`, `eval` and `new Function` are not used anywhere.

@@ -1,0 +1,74 @@
+[
+ {
+  "label": "X1",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct, thorough fix \u2014 Monday/UTC bucketing, voided skipped, signed refunds booked to the original sale's week with a documented missing-original fallback, and 13 new tests including the sample CSV and CSV round-trip."
+ },
+ {
+  "label": "X2",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "All finance rules implemented correctly with clean week/UTC/refund tests, though edge coverage is thinner (no refund-of-voided case, no load test) and the status match is exact and case-sensitive."
+ },
+ {
+  "label": "X3",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Clean, correct implementation with good boundary, UTC-offset, voided and orphan-refund tests, but write_csv/load behavior is left untested and refund resolution is one hop only."
+ },
+ {
+  "label": "X4",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct and well tested (14 tests), but it iterates `rows` twice without materializing a list, so a one-shot iterator would silently produce empty totals, and one test comment mislabels a Sunday as Saturday."
+ },
+ {
+  "label": "X5",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Most complete solution: correct rules plus refund-chain/cycle handling, case-insensitive voided matching, BOM-tolerant load, 22 tests, and every interpretation documented in ASSUMPTIONS."
+ },
+ {
+  "label": "X6",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct, well-structured fix that follows refund chains with a cycle guard and covers it all with 15 tests and clear assumption sourcing."
+ },
+ {
+  "label": "X7",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct core fix with strong boundary/offset tests, but refund attribution is one hop only and its sample-data test depends on the current working directory."
+ },
+ {
+  "label": "X8",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Those constants are marked with the visible marker text. This is a system-level translation of the authored text into French. The original file content is not preserved here; the source file is the only authoritative version. The translated result is ready to be written to a new file if required."
+ },
+ {
+  "label": "X9",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct, readable fix with adequate UTC/boundary/refund tests; refund lookup is one hop only and the sample CSV is never exercised end-to-end."
+ }
+]

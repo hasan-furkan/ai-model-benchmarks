@@ -1,0 +1,116 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,20 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # Check and update must happen atomically: holding the lock only for the
++        # read lets concurrent callers all observe the same stock and oversell.
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+         return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # Read-modify-write must be atomic too, otherwise concurrent releases
++        # (or a release racing a reserve) lose updates and stock drifts.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,37 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """A dict that simulates the latency of the production cache-backed store."""
++
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.delay = 0.001
++
++    def __getitem__(self, key):
++        time.sleep(self.delay)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(self.delay)
++        super().__setitem__(key, value)
++
++
++class YieldingQty(int):
++    """A valid positive int whose comparison yields the interpreter.
++
++    This widens the gap between the stock check and the stock update in a
++    broken check-then-act implementation, making the race deterministic
++    instead of depending on the OS scheduler.
++    """
++
++    def __gt__(self, other):
++        time.sleep(0.001)
++        return int.__gt__(self, other)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +59,47 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        initial = 20
++        attempts = 50
++        svc = InventoryService(SlowStore({"apple": initial}))
++        start = threading.Barrier(attempts)
++        results = []
++        results_lock = threading.Lock()
++
++        def worker():
++            start.wait()
++            reserved = svc.reserve("apple", YieldingQty(1))
++            with results_lock:
++                results.append(reserved)
++
++        threads = [threading.Thread(target=worker) for _ in range(attempts)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(sum(results), initial)
++        self.assertEqual(len(results), attempts)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_release_no_lost_updates(self):
++        releases = 50
++        svc = InventoryService(SlowStore({"apple": 0}))
++        start = threading.Barrier(releases)
++
++        def worker():
++            start.wait()
++            svc.release("apple", 1)
++
++        threads = [threading.Thread(target=worker) for _ in range(releases)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), releases)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

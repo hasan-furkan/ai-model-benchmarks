@@ -1,0 +1,74 @@
+[
+ {
+  "label": "X1",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Minimal, correct fix of both races with the strongest regression coverage (25-round barrier test with forced preemption plus a slow-store release test) and an honest report that even flags the global-lock throughput trade-off."
+ },
+ {
+  "label": "X2",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct minimal fix of both races with a genuine 100-thread, 10-round regression test, but it adds no test for the unlocked-release lost-update path and the report is thin."
+ },
+ {
+  "label": "X3",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct, clean fix; the regression test races a plain dict and relies only on a 1 \u00b5s switch interval instead of modelling the stated slow cache-backed store, so its reproduction is the least convincing."
+ },
+ {
+  "label": "X4",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct fix with a genuinely deterministic ticket-lock test, but it replaces the service's private `_lock` and carries a lot of test scaffolding for the effect it needs."
+ },
+ {
+  "label": "X5",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct fix with a deterministic trace-hook test, though 8 buyers for 8 units means oversell can only be detected via the final stock value, not the number of successful reservations."
+ },
+ {
+  "label": "X6",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct per-SKU locking that suits the slow production store and a deterministic PreemptibleInt test, but the `_sku_locks` registry grows without bound and the report never mentions it."
+ },
+ {
+  "label": "X7",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct minimal fix plus a clean, deterministic YieldingQty test that forces the check-then-act window and asserts exactly stock successes, with a second test for release drift."
+ },
+ {
+  "label": "X8",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Correct fix and a deterministic line-tracer test verified 8/8 against the old code, though the tracer sleeps on every line of the module and is heavier than needed."
+ },
+ {
+  "label": "X9",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correct minimal fix with a deterministic context-switch-lock test and release test, plus an honest note about the single global lock serializing all SKUs."
+ }
+]

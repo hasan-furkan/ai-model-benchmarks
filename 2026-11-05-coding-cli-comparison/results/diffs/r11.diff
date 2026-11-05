@@ -1,0 +1,136 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,22 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # The read, the stock check and the write must happen under a single
++        # lock acquisition. Releasing the lock between the check and the
++        # write lets two threads observe the same stock level and both
++        # succeed, which oversells the SKU.
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+         return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # Same reasoning as reserve(): an unlocked read-modify-write loses
++        # updates when two cancellations run concurrently.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,56 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowMapping(dict):
++    """A dict that yields on every access, like the slow cache-backed
++    production store, so a racing implementation has a wide window."""
++
++    def __init__(self, *args, delay=0.001, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.delay = delay
++
++    def __getitem__(self, key):
++        value = super().__getitem__(key)
++        time.sleep(self.delay)
++        return value
++
++    def __setitem__(self, key, value):
++        time.sleep(self.delay)
++        super().__setitem__(key, value)
++
++
++class ContextSwitchLock:
++    """Mutex that hands the CPU to another worker whenever it is released.
++
++    A loaded web server preempts a worker right after it leaves a critical
++    section. Doing that explicitly makes the race deterministic instead of
++    depending on the OS scheduler, so the regression test fails every time
++    on a non-atomic read-modify-write.
++    """
++
++    def __init__(self):
++        self._lock = threading.Lock()
++
++    def __enter__(self):
++        self._lock.acquire()
++        return self
++
++    def __exit__(self, exc_type, exc, tb):
++        self._lock.release()
++        time.sleep(0.005)
++        return False
++
++
++class ContextSwitchInventoryService(InventoryService):
++    """InventoryService whose lock allows a thread switch on release."""
++
++    def __init__(self, store):
++        super().__init__(store)
++        self._lock = ContextSwitchLock()
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +78,46 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        stock = 5
++        buyers = 20
++        svc = ContextSwitchInventoryService(SlowMapping({"apple": stock}))
++        barrier = threading.Barrier(buyers)
++        results = []
++        results_lock = threading.Lock()
++
++        def buy():
++            barrier.wait()
++            reserved = svc.reserve("apple", 1)
++            with results_lock:
++                results.append(reserved)
++
++        threads = [threading.Thread(target=buy) for _ in range(buyers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(results.count(True), stock)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_release_no_lost_updates(self):
++        savers = 10
++        svc = InventoryService(SlowMapping({"apple": 0}))
++        barrier = threading.Barrier(savers)
++
++        def give_back():
++            barrier.wait()
++            svc.release("apple", 1)
++
++        threads = [threading.Thread(target=give_back) for _ in range(savers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), savers)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

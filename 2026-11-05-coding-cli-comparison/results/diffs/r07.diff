@@ -1,0 +1,117 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,20 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # Check and update must happen under a single lock acquisition: otherwise
++        # two threads can read the same stock level and both reserve against it.
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # The read-modify-write must be atomic, or concurrent releases/cancellations
++        # lose updates and the stock count drifts.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,20 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """A cache-backed-like mapping whose accesses yield to other threads."""
++
++    def __getitem__(self, key):
++        time.sleep(0.001)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(0.001)
++        super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +42,64 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        units = 8
++        reserve_file = InventoryService.reserve.__code__.co_filename
++
++        # Force a thread switch on every line inside reserve(). With a correct
++        # implementation the switch happens while the lock is held; with a
++        # check-then-act implementation it exposes the oversell deterministically.
++        def yield_during_reserve(frame, event, arg):
++            if (
++                event == "line"
++                and frame.f_code.co_filename == reserve_file
++                and frame.f_code.co_name == "reserve"
++            ):
++                time.sleep(0.001)
++            return yield_during_reserve
++
++        svc = InventoryService(SlowStore({"apple": units}))
++        barrier = threading.Barrier(units)
++        results = []
++        results_lock = threading.Lock()
++
++        def worker():
++            barrier.wait()
++            reserved = svc.reserve("apple", 1)
++            with results_lock:
++                results.append(reserved)
++
++        previous_trace = threading.gettrace()
++        threading.settrace(yield_during_reserve)
++        threads = [threading.Thread(target=worker) for _ in range(units)]
++        try:
++            for thread in threads:
++                thread.start()
++            for thread in threads:
++                thread.join()
++        finally:
++            threading.settrace(previous_trace)
++
++        self.assertEqual(sum(results), units)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_release_no_lost_updates(self):
++        units = 16
++        svc = InventoryService(SlowStore({"apple": 0}))
++        barrier = threading.Barrier(units)
++
++        def worker():
++            barrier.wait()
++            svc.release("apple", 1)
++
++        threads = [threading.Thread(target=worker) for _ in range(units)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), units)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

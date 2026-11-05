@@ -1,0 +1,74 @@
+[
+ {
+  "label": "X1",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Correctly diagnosed that reserve() already wraps the whole read-modify-write in an instance-wide lock, left production code untouched per the no-reproduce rule, and backed that with three slow-store race tests plus mutant evidence that they bite."
+ },
+ {
+  "label": "X2",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Right diagnosis and an honest report with an error-surfacing harness, but only two race tests and no reserve/release or mixed-quantity coverage."
+ },
+ {
+  "label": "X3",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Three sound invariant tests over a latency-injecting store and a clear no-bug explanation, though without the mutant-control proof that X1, X6 and X8 report."
+ },
+ {
+  "label": "X4",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 3,
+  "note": "Correct verdict and a lock-disabled control check, but a single fixed 10-unit race test is the thinnest coverage of the set."
+ },
+ {
+  "label": "X5",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Compact and correct, with a no-op-lock control proving the tests detect the failure, but only the two basic race scenarios are covered."
+ },
+ {
+  "label": "X6",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Most thorough suite (last unit, multi-unit, mixed quantities, failed reserve, reserve/release) with a mutant sensitivity check and consistent gate/test counts; production correctly untouched."
+ },
+ {
+  "label": "X7",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 3,
+  "note": "Correct verdict with production untouched, but a single five-unit race test and no evidence that the test would actually catch a lock-free implementation."
+ },
+ {
+  "label": "X8",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 5,
+  "note": "Strong test-only fix: exact conservation accounting under randomized concurrent reserve/release, plus two mutants (lock removed, lock narrowed) proving the tests detect the defect."
+ },
+ {
+  "label": "X9",
+  "right_problem": "yes",
+  "correct": "yes",
+  "constraint_violations": "none",
+  "quality": 4,
+  "note": "Deterministic assertions (exactly five wins for 12 threads reserving 2 units each) backed by a lock-disabled control, but coverage stops at two tests."
+ }
+]

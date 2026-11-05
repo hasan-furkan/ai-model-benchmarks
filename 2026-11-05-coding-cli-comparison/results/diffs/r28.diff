@@ -1,0 +1,146 @@
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,52 @@
++import threading
++import time
+ import unittest
++from collections.abc import MutableMapping
+ 
+ from inventory import InventoryService
++
++
++class SlowCacheStore(MutableMapping):
++    """Stand-in for the production cache-backed store: every access has latency.
++
++    A slow mapping widens the read-modify-write window, which is exactly what
++    makes a lock-free `reserve()` oversell under thread contention.
++    """
++
++    def __init__(self, initial):
++        self._data = dict(initial)
++
++    def __getitem__(self, key):
++        time.sleep(0.0002)
++        return self._data[key]
++
++    def __setitem__(self, key, value):
++        time.sleep(0.0002)
++        self._data[key] = value
++
++    def __delitem__(self, key):
++        del self._data[key]
++
++    def __iter__(self):
++        return iter(self._data)
++
++    def __len__(self):
++        return len(self._data)
++
++
++def _run_threads(target, count):
++    """Start `count` threads that all call `target(index)` at the same moment."""
++    barrier = threading.Barrier(count)
++
++    def run(index):
++        barrier.wait()
++        target(index)
++
++    threads = [threading.Thread(target=run, args=(i,)) for i in range(count)]
++    for thread in threads:
++        thread.start()
++    for thread in threads:
++        thread.join()
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -29,5 +75,90 @@
+             self.svc.reserve("pear", 1)
+ 
+ 
++class ConcurrentReserveTest(unittest.TestCase):
++    """Regression tests for the reported flash-sale oversell.
++
++    One service instance is shared by all threads and the store is a slow
++    mapping, matching production. Every unit must be handed out at most once.
++    """
++
++    def _race_for_units(self, units, threads_count):
++        svc = InventoryService(SlowCacheStore({"apple": units}))
++        results = []
++        results_lock = threading.Lock()
++
++        def buy(_):
++            won = svc.reserve("apple", 1)
++            with results_lock:
++                results.append(won)
++
++        _run_threads(buy, threads_count)
++        return svc, results
++
++    def test_last_unit_has_exactly_one_winner(self):
++        for _ in range(5):
++            svc, results = self._race_for_units(units=1, threads_count=16)
++            self.assertEqual(sum(results), 1)
++            self.assertEqual(len(results), 16)
++            self.assertEqual(svc.available("apple"), 0)
++
++    def test_each_unit_is_sold_at_most_once(self):
++        units = 25
++        threads_count = 40
++        svc, results = self._race_for_units(units=units, threads_count=threads_count)
++        self.assertEqual(sum(results), units)
++        self.assertEqual(results.count(False), threads_count - units)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_stock_never_goes_negative_with_mixed_quantities(self):
++        units = 30
++        threads_count = 24
++        svc = InventoryService(SlowCacheStore({"apple": units}))
++        granted = []
++        granted_lock = threading.Lock()
++
++        def buy(index):
++            qty = 1 + (index % 3)
++            if svc.reserve("apple", qty):
++                with granted_lock:
++                    granted.append(qty)
++
++        _run_threads(buy, threads_count)
++        taken = sum(granted)
++        self.assertLessEqual(taken, units)
++        self.assertEqual(svc.available("apple"), units - taken)
++
++    def test_reserve_and_release_keep_the_total(self):
++        units = 10
++        svc = InventoryService(SlowCacheStore({"apple": units}))
++        reserved = []
++
++        def buy(_):
++            if svc.reserve("apple", 1):
++                reserved.append(1)
++
++        _run_threads(buy, 20)
++        self.assertEqual(len(reserved), units)
++        self.assertEqual(svc.available("apple"), 0)
++
++        def give_back(_):
++            svc.release("apple", 1)
++
++        _run_threads(give_back, units)
++        self.assertEqual(svc.available("apple"), units)
++
++    def test_failed_reserve_leaves_stock_untouched(self):
++        svc = InventoryService(SlowCacheStore({"apple": 3}))
++        self.assertTrue(svc.reserve("apple", 2))
++        results = []
++
++        def buy(_):
++            results.append(svc.reserve("apple", 2))
++
++        _run_threads(buy, 12)
++        self.assertEqual(results, [False] * 12)
++        self.assertEqual(svc.available("apple"), 1)
++
++
+ if __name__ == "__main__":
+     unittest.main()

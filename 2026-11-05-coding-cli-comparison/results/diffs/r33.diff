@@ -1,0 +1,128 @@
+--- a/inventory.py
++++ b/inventory.py
+@@ -28,16 +28,19 @@
+     def reserve(self, sku: str, qty: int) -> bool:
+         """Take `qty` units if that many are in stock and return True; otherwise change nothing and return False."""
+         self._check_qty(qty)
++        # Check and update must happen under one lock: otherwise two threads can
++        # both read the same stock level and each sell the same units.
+         with self._lock:
+             current = int(self.store[sku])
+-        if current < qty:
+-            return False
+-        with self._lock:
++            if current < qty:
++                return False
+             self.store[sku] = current - qty
+-        return True
++            return True
+ 
+     def release(self, sku: str, qty: int) -> None:
+         """Put `qty` units back (e.g. a cancelled order)."""
+         self._check_qty(qty)
+-        current = int(self.store[sku])
+-        self.store[sku] = current + qty
++        # Read-modify-write must be atomic, or concurrent cancellations lose units.
++        with self._lock:
++            current = int(self.store[sku])
++            self.store[sku] = current + qty
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,30 @@
++import sys
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """Cache-backed style mapping: reads and writes take real time.
++
++    Production uses a slow cache-backed mapping, so a read followed by a write
++    is a long window for another thread to read the same stale value.
++    """
++
++    def __init__(self, *args, delay=0.001, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.delay = delay
++
++    def __getitem__(self, key):
++        value = super().__getitem__(key)
++        time.sleep(self.delay)
++        return value
++
++    def __setitem__(self, key, value):
++        time.sleep(self.delay)
++        super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -28,6 +52,66 @@
+         with self.assertRaises(KeyError):
+             self.svc.reserve("pear", 1)
+ 
++    def test_concurrent_reserve_no_oversell(self):
++        stock = 10
++        workers = 40
++        rounds = 25
++        old_interval = sys.getswitchinterval()
++        # Tiny switch interval forces preemption between the stock read and the
++        # write, which is where the check-then-act race hides.
++        sys.setswitchinterval(1e-6)
++        try:
++            for round_no in range(rounds):
++                svc = InventoryService({"apple": stock})
++                start = threading.Barrier(workers)
++                results = []
++                results_lock = threading.Lock()
++
++                def worker():
++                    start.wait()
++                    granted = svc.reserve("apple", 1)
++                    with results_lock:
++                        results.append(granted)
++
++                threads = [threading.Thread(target=worker) for _ in range(workers)]
++                for thread in threads:
++                    thread.start()
++                for thread in threads:
++                    thread.join()
++
++                granted = sum(1 for ok in results if ok)
++                self.assertEqual(len(results), workers)
++                self.assertLessEqual(
++                    granted, stock, f"round {round_no}: sold {granted} of {stock} units"
++                )
++                self.assertEqual(
++                    svc.available("apple"),
++                    stock - granted,
++                    f"round {round_no}: stock count drifted from granted reservations",
++                )
++                self.assertEqual(granted, stock, f"round {round_no}: stock was not fully sold")
++        finally:
++            sys.setswitchinterval(old_interval)
++
++    def test_concurrent_release_keeps_count(self):
++        stock = 100
++        svc = InventoryService(SlowStore({"apple": 0}))
++        workers = 20
++        start = threading.Barrier(workers)
++
++        def worker():
++            start.wait()
++            for _ in range(5):
++                svc.release("apple", 1)
++
++        threads = [threading.Thread(target=worker) for _ in range(workers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(svc.available("apple"), workers * 5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

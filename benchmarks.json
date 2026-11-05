@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-11-05-coding-cli-comparison",
+    "date": "2026-11-05",
+    "title": {
+      "tr": "Kodlama CLI'ları: deepseek-agent.ps1, opencode run ve dsh",
+      "en": "Coding CLIs: deepseek-agent.ps1 vs opencode run vs dsh"
+    },
+    "summary": {
+      "tr": "Üç araç da 45 koşunun hepsini çözdü; opencode en ucuz, dsh en pahalı. Karar: işçilerde deepseek-agent.ps1 ile devam.",
+      "en": "All three harnesses solved all 45 runs; opencode is the cheapest, dsh the most expensive. Decision: keep deepseek-agent.ps1 for workers."
+    },
+    "path": "2026-11-05-coding-cli-comparison/"
+  },
+  {
     "id": "2026-10-28-deepseek-v4.1-flash-high-vs-max",
     "date": "2026-10-28",
     "title": {

@@ -1,0 +1,1 @@
+Without using any tools, answer in English: (1) List every instructions/memory file you were given (e.g. CLAUDE.md, AGENTS.md), with its path and first heading. (2) Say whether any session-start hook injected context, and quote its first line. (3) List skills and MCP servers you can see, names only. If none, say none. Do not guess.

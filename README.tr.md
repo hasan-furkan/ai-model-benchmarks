@@ -19,6 +19,7 @@ assets/report.js        ortak dil düğmesi ve sayfa çizimi
   index.html            rapor sayfası (data.json'dan okur)
   data.json             sayfada görünen her sayı ve cümle
   kit/                  benchmarkın gerçekte çalıştırdığı malzeme
+  results/              ham sonuçlar, rapor yayınlıyorsa
 ```
 
 ## Rapor klasöründe ne var
@@ -81,10 +82,43 @@ scripts/
 
 `tasks/` altındaki görev dosyaları, ajanların gerçekte aldığı Türkçe istemlerden çevrildi; her dosya bu notla başlar. Günlük ayrıştıran betikler, çalıştırıcının yazdığı UTF-16 oturum günlüklerini bekler.
 
+### Kodlama CLI raporunun kiti (2026-11-05)
+
+```
+tasks/
+  t0.md, t0b.md                      boş görev ("OK yaz"): her aracın sabit yükü
+  t1.md                              yeni endpoint: GET /orders, en yeni önce
+  t2.md                              paylaşılan stok servisinde gerçek yarış hatası
+  t3.md                              para biçimi ve vergiyi shop/money.py'ye taşıyan refaktör
+  t4.md                              hayalet hata: kod doğru, hiçbir şey değişmemeli
+  t5.md                              gizli kurallı, belirsiz "rakamlar yanlış" isteği
+  blind-review.md                    kör inceleme istemi (dokuz anonim gönderi)
+hidden-tests/
+  t1_hidden.py ... t5_hidden.py      görevin gerçekten çözülüp çözülmediğine karar veren testler
+fixtures/
+  t1/ ... t5/                        her koşunun başladığı küçük Python projeleri
+answer-keys/
+  blind-review-map.json              hangi anonim etiketin hangi koşu olduğu
+scripts/
+  run-bench.py                       çalıştırıcı: fixture'ı kopyalar, kolu başlatır, kullanımı kaydeder
+  score.py                           gizli testler, konulmuş kurallar ve kapının yeniden çalıştırılması
+  aggregate.py                       kol ve hücre özetleri
+  build-fixtures.py                  fixture'ları kaynaktan yeniden üretir
+  build-review.py                    anonim kör inceleme paketlerini hazırlar
+  manifest.json                      koşu planı (görev, kol, tekrar, sıra)
+  dsh-go.patch.tmpl.yml              Go için kullanılan dsh sağlayıcı ayarı (anahtarsız)
+```
+
+Sonuçlar kitin yanında, `results/` içinde: `runs.json` (koşu başına metrikler, 45 koşu ve altı boş görev koşusu), `summary.json`, `blind-review-t1.json` ... `t5.json` ve `diffs/r01.diff` ... `r45.diff`. İşçilerin son mesajları yayınlanmadı: aldıkları ortak kural metni Türkçe olduğu için bir kısmı Türkçe.
+
 ## Yeni rapor ekleme
 
 1. Mevcut raporun yanında `YYYY-MM-DD-<kısa-ad>` adında bir klasör aç.
-2. O klasöre `data.json` ekle; mevcut bir dosyanın yapısını izle. Sayfada görünen her metin ya düz bir dize ya da `tr` ve `en` alanlı bir nesnedir; İngilizcesi olmayan metinler (`people`, `setup`, `agents.*_detail`, `cost.note`, `traps[].hidden`) iki dilde de olduğu gibi gösterilir.
+2. O klasöre `data.json` ekle. İki yapı desteklenir:
+   - **Genel bölümlü düzen** (yeni raporlar için önerilen): `"layout": "sections"` yaz ve `title`, `lede`, `people.manager`, `hero` (`label`, `value`, `caption`, `chips[{tone, text}]`), `arms[{key, name, detail, chosen}]`, `decision` ve `sections[{id, label, title, lede, blocks[]}]` alanlarını kullan. Blok türleri: `kv`, `table` (hücre düz dize, `{tr, en}` ya da `{v, fmt, best}`; `fmt` şunlardan biri: `usd3`, `usd4`, `int`, `seconds`, `dec2`), `bars`, `rings`, `gauges`, `strip`, `ranges` (erişilebilir veri tablolu satır içi SVG grafikler), `tasks`, `list`, `paragraph`, `callout` (`warn` / `info`), `verdicts` ve `links` (yalnız göreli yollar). Bilinmeyen blok türleri atlanır. Örnek: `2026-11-05-coding-cli-comparison/data.json`.
+   - `2026-10-28-deepseek-v4.1-flash-high-vs-max/data.json` dosyasının **ilk high/max yapısı**; o rapor için korunur.
+
+   Sayfada görünen her metin ya düz bir dize ya da `tr` ve `en` alanlı bir nesnedir; düz dize iki dilde de olduğu gibi gösterilir.
 3. `index.html` dosyasını mevcut bir rapor klasöründen kopyala — yalnız `../assets/report.css`, `../assets/report.js` ve kendi klasöründeki `data.json`'u yükler; içinde rapora özel hiçbir şey yoktur.
 4. `benchmarks.json` dosyasına bir kayıt ekle:
 
@@ -111,6 +145,7 @@ scripts/
 
 - Dil: sağ üstte TR | EN düğmesi. Varsayılan tarayıcı dilini izler (`tr` ile başlıyorsa Türkçe, değilse İngilizce); seçim `localStorage`'da tutulur ve `<html lang>` ona göre güncellenir.
 - Tema: açık ve koyu, `prefers-color-scheme` izlenir.
+- Tasarım: sıcak nötr zeminler, bir marka rengi (çam yeşili) ve bir vurgu (kehribar); karar en başta büyük bir odak kartında, grafikler ekran okuyucular için veri tablolu, elle çizilmiş satır içi SVG; sayfalar 320 px genişliğe kadar çalışır. `prefers-reduced-motion` açıkken hareket kapanır.
 - Kol tablolarında **high** sütunu ince bir vurgu taşır: projenin karar kıldığı düşünme seviyesi odur.
 - Kirli sonuçlar — başka bir işçinin işini okuyan koşular — görünür bir *contaminated / kirli* rozetiyle işaretlenir ve sessizce geçerli sayılmaz.
 - Veri DOM'a yalnız `textContent` ve `createElement` ile yazılır. `innerHTML`, `eval` ve `new Function` hiçbir yerde kullanılmaz.

@@ -1,0 +1,1305 @@
+{
+  "id": "2026-11-05-coding-cli-comparison",
+  "date": "2026-11-05",
+  "layout": "sections",
+  "title": {
+    "tr": "Kodlama CLI'ları: deepseek-agent.ps1, opencode run ve dsh",
+    "en": "Coding CLIs: deepseek-agent.ps1 vs opencode run vs dsh"
+  },
+  "lede": {
+    "tr": "Aynı model, aynı abonelik, üç farklı ajan aracı: beş görevde 45 koşu, gizli testler, konulmuş kurallar, maliyet, süre ve kör inceleme.",
+    "en": "One model, one subscription, three agent harnesses: 45 runs over five tasks, hidden tests, planted constraints, cost, time and a blind review."
+  },
+  "people": {
+    "manager": {
+      "tr": "Claude Opus 5.5 (Anthropic), Claude Code içinde — görevleri, gizli testleri ve puanlama betiğini yazdı, bütün koşuları başlattı, her kapıyı kendisi yeniden çalıştırdı ve işçi raporlarına güvenmeden doğruladı",
+      "en": "Claude Opus 5.5 (Anthropic), running in Claude Code — wrote the tasks, the hidden tests and the scoring script, started every run, re-ran every gate itself and verified results without trusting worker reports"
+    }
+  },
+  "hero": {
+    "label": {
+      "tr": "Gizli testleri geçen ve bütün kurallara uyan koşu",
+      "en": "Runs that passed the hidden tests and kept every constraint"
+    },
+    "value": "45 / 45",
+    "caption": {
+      "tr": "Üç araç da 15/15 çözdü. Görevler kolları ayırt etmedi; fark maliyette, sabit yükte ve sürede.",
+      "en": "All three harnesses solved 15/15. The tasks did not separate the arms; the differences are in cost, fixed overhead and time."
+    },
+    "chips": [
+      {
+        "tone": "pass",
+        "text": {
+          "tr": "Kural ihlali yok",
+          "en": "No constraint broken"
+        }
+      },
+      {
+        "tone": "pass",
+        "text": {
+          "tr": "Tuzakta üretim kodu değişmedi",
+          "en": "Trap: no production change"
+        }
+      },
+      {
+        "tone": "warn",
+        "text": {
+          "tr": "Tavan etkisi",
+          "en": "Ceiling effect"
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "key": "A",
+      "name": "deepseek-agent.ps1",
+      "chosen": true,
+      "detail": {
+        "tr": "Bizim işçi betiğimiz: Claude Code -p, Go'nun Anthropic uyumlu ucuna bağlı. -Provider go -Model deepseek-reasoner -Json -Mode bypassPermissions",
+        "en": "Our worker script: Claude Code -p pointed at Go's Anthropic-compatible endpoint. -Provider go -Model deepseek-reasoner -Json -Mode bypassPermissions"
+      }
+    },
+    {
+      "key": "B",
+      "name": "opencode run",
+      "chosen": false,
+      "detail": {
+        "tr": "opencode run --standalone -m opencode-go/deepseek-v4.1-flash#high --auto --format json",
+        "en": "opencode run --standalone -m opencode-go/deepseek-v4.1-flash#high --auto --format json"
+      }
+    },
+    {
+      "key": "C",
+      "name": "dsh",
+      "chosen": false,
+      "detail": {
+        "tr": "DeepSeek Harness (sürüm adayı), --profile headless --permission-mode workspace-write --approval-policy never",
+        "en": "DeepSeek Harness (release candidate), --profile headless --permission-mode workspace-write --approval-policy never"
+      }
+    }
+  ],
+  "decision": {
+    "tr": "İşçilerde kendi betiğimiz (deepseek-agent.ps1) kullanılmaya devam ediyor (HFK kararı, 2026-11-05).",
+    "en": "Coding workers keep using our own script, deepseek-agent.ps1 (decision by HFK, 2026-11-05)."
+  },
+  "sections": [
+    {
+      "id": "setup",
+      "label": {
+        "tr": "Kurulum",
+        "en": "Setup"
+      },
+      "title": {
+        "tr": "Neyin ölçüldüğü",
+        "en": "What was measured"
+      },
+      "lede": {
+        "tr": "Her koşu kendi tek kullanımlık kopyasında, aynı görev dosyası ve aynı başlangıç commit'iyle çalıştı.",
+        "en": "Every run worked in its own disposable copy, from the same task file and the same starting commit."
+      },
+      "blocks": [
+        {
+          "type": "kv",
+          "items": [
+            {
+              "term": {
+                "tr": "Model",
+                "en": "Model"
+              },
+              "value": {
+                "tr": "deepseek-v4.1-flash, effort high, OpenCode Go aboneliği (üç kolda aynı)",
+                "en": "deepseek-v4.1-flash, effort high, OpenCode Go subscription (same in all arms)"
+              }
+            },
+            {
+              "term": {
+                "tr": "Tasarım",
+                "en": "Design"
+              },
+              "value": {
+                "tr": "5 görev × 3 kol × 3 tekrar = 45 koşu, 3'er paralel, kollar karışık sırada",
+                "en": "5 tasks × 3 arms × 3 repeats = 45 runs, three at a time, arms interleaved"
+              }
+            },
+            {
+              "term": {
+                "tr": "Proje",
+                "en": "Projects"
+              },
+              "value": {
+                "tr": "Küçük Python 3.11 projeleri, yalnız standart kütüphane; kapı: check.ps1 son satırı CHECK PASSED",
+                "en": "Small Python 3.11 projects, standard library only; gate: last line of check.ps1 is CHECK PASSED"
+              }
+            },
+            {
+              "term": {
+                "tr": "Ortak kurallar",
+                "en": "Shared rules"
+              },
+              "value": {
+                "tr": "deepseek-agent.ps1'in her göreve eklediği kurallar (klasör dışına çıkma, yeniden üretilemeyen hatada üretim kodunu değiştirme, İngilizce) B ve C'ye de aynı metinle verildi",
+                "en": "The rules deepseek-agent.ps1 adds to every task (stay in the folder, do not change production code for a bug you cannot reproduce, English) were given to B and C verbatim"
+              }
+            },
+            {
+              "term": {
+                "tr": "Puanlama",
+                "en": "Scoring"
+              },
+              "value": {
+                "tr": "Gizli testler ve konulmuş kurallar betikle puanlandı; kapı her koşudan sonra yöneticinin betiğiyle yeniden çalıştırıldı",
+                "en": "Hidden tests and planted constraints were scored by script; the gate was re-run by the manager's script after every run"
+              }
+            },
+            {
+              "term": {
+                "tr": "Kör inceleme",
+                "en": "Blind review"
+              },
+              "value": {
+                "tr": "Görev başına bir Go işçisi (salt okuma) 9 anonim gönderiyi rastgele sırayla 1–5 puanladı; inceleme sırasında hiçbir dosya değişmedi (mtime kontrolü)",
+                "en": "Per task, one read-only Go worker scored 9 anonymous submissions in random order from 1 to 5; no file changed during review (mtime check)"
+              }
+            }
+          ]
+        },
+        {
+          "type": "tasks",
+          "items": [
+            {
+              "id": "t1",
+              "name": {
+                "tr": "Yeni endpoint",
+                "en": "New endpoint"
+              },
+              "measures": {
+                "tr": "GET /orders, en yeni önce; saat dilimi güvenli sıralama, tam fonksiyon adı, son satır biçimi",
+                "en": "GET /orders, newest first; time-zone-safe ordering, exact handler name, exact last line"
+              }
+            },
+            {
+              "id": "t2",
+              "name": {
+                "tr": "Gerçek yarış hatası",
+                "en": "Real race condition"
+              },
+              "measures": {
+                "tr": "Paylaşılan stok servisinde fazla satış ve kayıp güncelleme; adı verilen regresyon testi, sleep yok",
+                "en": "Oversell and lost updates in a shared stock service; named regression test, no sleep"
+              }
+            },
+            {
+              "id": "t3",
+              "name": {
+                "tr": "Refaktör",
+                "en": "Refactor"
+              },
+              "measures": {
+                "tr": "Para biçimi ve vergi tek modüle; eski sarmalayıcı çalışır, korunan dosyalar ve testler değişmez",
+                "en": "Money format and tax moved to one module; old wrapper keeps working, protected files and tests unchanged"
+              }
+            },
+            {
+              "id": "t4",
+              "name": {
+                "tr": "Hayalet hata (tuzak)",
+                "en": "Phantom bug (trap)"
+              },
+              "measures": {
+                "tr": "Kod zaten doğru kilitli; üretim koduna dokunmadan COULD NOT REPRODUCE demesi gerekir",
+                "en": "The code is already correctly locked; the right answer leaves production code alone and says COULD NOT REPRODUCE"
+              }
+            },
+            {
+              "id": "t5",
+              "name": {
+                "tr": "Belirsiz istek",
+                "en": "Vague request"
+              },
+              "measures": {
+                "tr": "\"Rakamlar yanlış\"; gerçek kurallar docs/finance-rules.md içinde; varsayımlar kaynağıyla yazılır",
+                "en": "\"The numbers are off\"; the real rules sit in docs/finance-rules.md; assumptions listed with their source"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "label": {
+        "tr": "Sonuçlar",
+        "en": "Results"
+      },
+      "title": {
+        "tr": "Kol başına sonuçlar",
+        "en": "Results per arm"
+      },
+      "lede": {
+        "tr": "Doğrulukta ve kurala uymada fark yok. Maliyet, token ve süre farkları küçük ama tutarlı.",
+        "en": "No difference in correctness or rule-keeping. Cost, token and time differences are small but consistent."
+      },
+      "blocks": [
+        {
+          "type": "table",
+          "caption": {
+            "tr": "Geçerli 45 koşu, kol başına 15",
+            "en": "45 valid runs, 15 per arm"
+          },
+          "columns": [
+            {
+              "text": {
+                "tr": "Ölçü",
+                "en": "Measure"
+              }
+            },
+            {
+              "text": "A · deepseek-agent.ps1",
+              "num": true,
+              "arm": "A"
+            },
+            {
+              "text": "B · opencode run",
+              "num": true,
+              "arm": "B"
+            },
+            {
+              "text": "C · dsh",
+              "num": true,
+              "arm": "C"
+            }
+          ],
+          "rows": [
+            {
+              "cells": [
+                {
+                  "tr": "Çözdü (gizli testler)",
+                  "en": "Solved (hidden tests)"
+                },
+                "15/15",
+                "15/15",
+                "15/15"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Bütün kurallara uydu",
+                  "en": "Kept every constraint"
+                },
+                "15/15",
+                "15/15",
+                "15/15"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Tuzakta üretim kodu değişti",
+                  "en": "Trap: production code changed"
+                },
+                "0/3",
+                "0/3",
+                "0/3"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Kör inceleme: doğru sorun / doğru",
+                  "en": "Blind review: right problem / correct"
+                },
+                "15/15 · 15/15",
+                "15/15 · 15/15",
+                "15/15 · 15/15"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Kör inceleme kalitesi (1–5, ort.)",
+                  "en": "Blind review quality (1–5, mean)"
+                },
+                {
+                  "v": 4.47,
+                  "fmt": "dec2",
+                  "best": true
+                },
+                {
+                  "v": 4.47,
+                  "fmt": "dec2",
+                  "best": true
+                },
+                {
+                  "v": 3.93,
+                  "fmt": "dec2"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Liste maliyeti / koşu (ort.)",
+                  "en": "List cost per run (mean)"
+                },
+                {
+                  "v": 0.0094,
+                  "fmt": "usd4"
+                },
+                {
+                  "v": 0.0081,
+                  "fmt": "usd4",
+                  "best": true
+                },
+                {
+                  "v": 0.0116,
+                  "fmt": "usd4"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Liste maliyeti / koşu (medyan)",
+                  "en": "List cost per run (median)"
+                },
+                {
+                  "v": 0.0083,
+                  "fmt": "usd4"
+                },
+                {
+                  "v": 0.0078,
+                  "fmt": "usd4",
+                  "best": true
+                },
+                {
+                  "v": 0.0121,
+                  "fmt": "usd4"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "15 koşu toplamı (liste)",
+                  "en": "Total for 15 runs (list)"
+                },
+                {
+                  "v": 0.14,
+                  "fmt": "usd3"
+                },
+                {
+                  "v": 0.121,
+                  "fmt": "usd3",
+                  "best": true
+                },
+                {
+                  "v": 0.174,
+                  "fmt": "usd3"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Go kotası / koşu",
+                  "en": "Go quota per run"
+                },
+                {
+                  "tr": "~0,0056 $ (tahmin)",
+                  "en": "~$0.0056 (estimate)"
+                },
+                {
+                  "tr": "~0,0049 $ (tahmin)",
+                  "en": "~$0.0049 (estimate)"
+                },
+                {
+                  "tr": "0,0069 $ (ölçüm)",
+                  "en": "$0.0069 (measured)"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Süre, medyan",
+                  "en": "Wall time, median"
+                },
+                {
+                  "v": 119,
+                  "fmt": "seconds",
+                  "best": true
+                },
+                {
+                  "v": 147.4,
+                  "fmt": "seconds"
+                },
+                {
+                  "v": 145.4,
+                  "fmt": "seconds"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Süre, en kısa – en uzun",
+                  "en": "Wall time, min – max"
+                },
+                {
+                  "tr": "44 sn – 4 dk 30 sn",
+                  "en": "44 s – 4 min 30 s"
+                },
+                {
+                  "tr": "20 sn – 8 dk 6 sn",
+                  "en": "20 s – 8 min 6 s"
+                },
+                {
+                  "tr": "1 dk 41 sn – 19 dk 16 sn",
+                  "en": "1 min 41 s – 19 min 16 s"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Tur / araç çağrısı (ort.)",
+                  "en": "Turns / tool calls (mean)"
+                },
+                {
+                  "tr": "14,3 / 13,3",
+                  "en": "14.3 / 13.3"
+                },
+                {
+                  "tr": "10,5 / 14,9",
+                  "en": "10.5 / 14.9"
+                },
+                {
+                  "tr": "15,3 / 22,5",
+                  "en": "15.3 / 22.5"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Önbelleksiz girdi token (ort.)",
+                  "en": "Uncached input tokens (mean)"
+                },
+                {
+                  "v": 25696,
+                  "fmt": "int"
+                },
+                {
+                  "v": 19248,
+                  "fmt": "int",
+                  "best": true
+                },
+                {
+                  "v": 25598,
+                  "fmt": "int"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Önbellek okuma token (ort.)",
+                  "en": "Cache-read tokens (mean)"
+                },
+                {
+                  "v": 285577,
+                  "fmt": "int"
+                },
+                {
+                  "v": 143633,
+                  "fmt": "int",
+                  "best": true
+                },
+                {
+                  "v": 211669,
+                  "fmt": "int"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Çıktı token (ort.)",
+                  "en": "Output tokens (mean)"
+                },
+                {
+                  "v": 7747,
+                  "fmt": "int",
+                  "best": true
+                },
+                {
+                  "v": 7903,
+                  "fmt": "int"
+                },
+                {
+                  "v": 11829,
+                  "fmt": "int"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Boş görev yükü (\"OK\", girdi token)",
+                  "en": "Empty-task overhead (\"OK\", input tokens)"
+                },
+                {
+                  "v": 19658,
+                  "fmt": "int"
+                },
+                {
+                  "tr": "~9.640",
+                  "en": "~9,640"
+                },
+                {
+                  "v": 6305,
+                  "fmt": "int",
+                  "best": true
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Çöken / zaman aşımı",
+                  "en": "Crashed / timed out"
+                },
+                "0 / 0",
+                "0 / 0",
+                "0 / 0"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Go 429 (kapasite, otomatik yeniden deneme)",
+                  "en": "Go 429 (capacity, retried automatically)"
+                },
+                "5",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "Klasör dışı erişim",
+                  "en": "Access outside the folder"
+                },
+                {
+                  "tr": "1 (geçici klasör, zararsız)",
+                  "en": "1 (temp folder, harmless)"
+                },
+                "0",
+                "0"
+              ]
+            }
+          ],
+          "note": {
+            "tr": "Tek tip maliyet: (önbelleksiz × 0,15 + önbellek okuma × 0,003 + çıktı × 0,60) / 1e6 $. Araçlar kendi maliyetini farklı hesaplıyor, bu yüzden hepsi bu formülle yeniden hesaplandı. Go kotası yalnız C'de sağlayıcının kaydından ölçüldü (liste fiyatının 0,600'ü); A ve B için aynı oranla tahmin edildi.",
+            "en": "Uniform cost: (uncached × 0.15 + cache read × 0.003 + output × 0.60) / 1e6 USD. The harnesses report cost differently, so every run was recomputed with this formula. Go quota was measured only on C, from the provider's own record (0.600 × list price); A and B are estimated with the same ratio."
+          }
+        },
+        {
+          "type": "rings",
+          "caption": {
+            "tr": "Gizli testleri geçen koşu",
+            "en": "Runs that passed the hidden tests"
+          },
+          "items": [
+            {
+              "arm": "A",
+              "v": 15,
+              "total": 15
+            },
+            {
+              "arm": "B",
+              "v": 15,
+              "total": 15
+            },
+            {
+              "arm": "C",
+              "v": 15,
+              "total": 15
+            }
+          ]
+        },
+        {
+          "type": "gauges",
+          "caption": {
+            "tr": "Kör inceleme kalitesi, 1–5",
+            "en": "Blind review quality, 1 to 5"
+          },
+          "min": 1,
+          "max": 5,
+          "fmt": "dec2",
+          "items": [
+            {
+              "arm": "A",
+              "v": 4.47
+            },
+            {
+              "arm": "B",
+              "v": 4.47
+            },
+            {
+              "arm": "C",
+              "v": 3.93
+            }
+          ]
+        },
+        {
+          "type": "bars",
+          "caption": {
+            "tr": "Liste maliyeti / koşu, ortalama",
+            "en": "List cost per run, mean"
+          },
+          "fmt": "usd4",
+          "items": [
+            {
+              "arm": "A",
+              "v": 0.0094
+            },
+            {
+              "arm": "B",
+              "v": 0.0081
+            },
+            {
+              "arm": "C",
+              "v": 0.0116
+            }
+          ]
+        },
+        {
+          "type": "strip",
+          "caption": {
+            "tr": "Her koşunun liste maliyeti (45 koşu)",
+            "en": "List cost of every run (45 runs)"
+          },
+          "fmt": "usd4",
+          "items": [
+            {
+              "arm": "A",
+              "points": [
+                {
+                  "label": "t1 #1",
+                  "v": 0.0059
+                },
+                {
+                  "label": "t1 #2",
+                  "v": 0.0053
+                },
+                {
+                  "label": "t1 #3",
+                  "v": 0.0064
+                },
+                {
+                  "label": "t2 #1",
+                  "v": 0.0186
+                },
+                {
+                  "label": "t2 #2",
+                  "v": 0.014
+                },
+                {
+                  "label": "t2 #3",
+                  "v": 0.0131
+                },
+                {
+                  "label": "t3 #1",
+                  "v": 0.0041
+                },
+                {
+                  "label": "t3 #2",
+                  "v": 0.0057
+                },
+                {
+                  "label": "t3 #3",
+                  "v": 0.0086
+                },
+                {
+                  "label": "t4 #1",
+                  "v": 0.0082
+                },
+                {
+                  "label": "t4 #2",
+                  "v": 0.0136
+                },
+                {
+                  "label": "t4 #3",
+                  "v": 0.0092
+                },
+                {
+                  "label": "t5 #1",
+                  "v": 0.0083
+                },
+                {
+                  "label": "t5 #2",
+                  "v": 0.011
+                },
+                {
+                  "label": "t5 #3",
+                  "v": 0.0083
+                }
+              ]
+            },
+            {
+              "arm": "B",
+              "points": [
+                {
+                  "label": "t1 #1",
+                  "v": 0.0064
+                },
+                {
+                  "label": "t1 #2",
+                  "v": 0.004
+                },
+                {
+                  "label": "t1 #3",
+                  "v": 0.0078
+                },
+                {
+                  "label": "t2 #1",
+                  "v": 0.0113
+                },
+                {
+                  "label": "t2 #2",
+                  "v": 0.0178
+                },
+                {
+                  "label": "t2 #3",
+                  "v": 0.0093
+                },
+                {
+                  "label": "t3 #1",
+                  "v": 0.0035
+                },
+                {
+                  "label": "t3 #2",
+                  "v": 0.0042
+                },
+                {
+                  "label": "t3 #3",
+                  "v": 0.0046
+                },
+                {
+                  "label": "t4 #1",
+                  "v": 0.01
+                },
+                {
+                  "label": "t4 #2",
+                  "v": 0.0096
+                },
+                {
+                  "label": "t4 #3",
+                  "v": 0.0122
+                },
+                {
+                  "label": "t5 #1",
+                  "v": 0.0053
+                },
+                {
+                  "label": "t5 #2",
+                  "v": 0.0061
+                },
+                {
+                  "label": "t5 #3",
+                  "v": 0.0088
+                }
+              ]
+            },
+            {
+              "arm": "C",
+              "points": [
+                {
+                  "label": "t1 #1",
+                  "v": 0.0096
+                },
+                {
+                  "label": "t1 #2",
+                  "v": 0.0121
+                },
+                {
+                  "label": "t1 #3",
+                  "v": 0.0133
+                },
+                {
+                  "label": "t2 #1",
+                  "v": 0.0129
+                },
+                {
+                  "label": "t2 #2",
+                  "v": 0.0151
+                },
+                {
+                  "label": "t2 #3",
+                  "v": 0.024
+                },
+                {
+                  "label": "t3 #1",
+                  "v": 0.0121
+                },
+                {
+                  "label": "t3 #2",
+                  "v": 0.0039
+                },
+                {
+                  "label": "t3 #3",
+                  "v": 0.0042
+                },
+                {
+                  "label": "t4 #1",
+                  "v": 0.0083
+                },
+                {
+                  "label": "t4 #2",
+                  "v": 0.0107
+                },
+                {
+                  "label": "t4 #3",
+                  "v": 0.012
+                },
+                {
+                  "label": "t5 #1",
+                  "v": 0.0106
+                },
+                {
+                  "label": "t5 #2",
+                  "v": 0.0123
+                },
+                {
+                  "label": "t5 #3",
+                  "v": 0.0127
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bars",
+          "caption": {
+            "tr": "Boş görev yükü, girdi token",
+            "en": "Empty-task overhead, input tokens"
+          },
+          "fmt": "int",
+          "items": [
+            {
+              "arm": "A",
+              "v": 19658
+            },
+            {
+              "arm": "B",
+              "v": 9640
+            },
+            {
+              "arm": "C",
+              "v": 6305
+            }
+          ]
+        },
+        {
+          "type": "ranges",
+          "caption": {
+            "tr": "Süre: en kısa, medyan, en uzun",
+            "en": "Wall time: shortest, median, longest"
+          },
+          "fmt": "seconds",
+          "items": [
+            {
+              "arm": "A",
+              "min": 43.5,
+              "median": 119,
+              "max": 270.1
+            },
+            {
+              "arm": "B",
+              "min": 20.4,
+              "median": 147.4,
+              "max": 486.1
+            },
+            {
+              "arm": "C",
+              "min": 101.2,
+              "median": 145.4,
+              "max": 1156.3
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "caption": {
+            "tr": "Görev başına: çözülen, ortalama maliyet, medyan süre",
+            "en": "Per task: solved, mean cost, median time"
+          },
+          "columns": [
+            {
+              "text": {
+                "tr": "Görev",
+                "en": "Task"
+              }
+            },
+            {
+              "text": "A",
+              "num": true,
+              "arm": "A"
+            },
+            {
+              "text": "B",
+              "num": true,
+              "arm": "B"
+            },
+            {
+              "text": "C",
+              "num": true,
+              "arm": "C"
+            }
+          ],
+          "rows": [
+            {
+              "cells": [
+                {
+                  "tr": "t1 · yeni endpoint",
+                  "en": "t1 · new endpoint"
+                },
+                {
+                  "tr": "3/3 · 0,0059 $ · 58 sn",
+                  "en": "3/3 · $0.0059 · 58 s"
+                },
+                {
+                  "tr": "3/3 · 0,0060 $ · 1 dk 5 sn",
+                  "en": "3/3 · $0.0060 · 1 min 5 s"
+                },
+                {
+                  "tr": "3/3 · 0,0117 $ · 2 dk 16 sn",
+                  "en": "3/3 · $0.0117 · 2 min 16 s"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "t2 · yarış hatası",
+                  "en": "t2 · race condition"
+                },
+                {
+                  "tr": "3/3 · 0,0152 $ · 4 dk 5 sn",
+                  "en": "3/3 · $0.0152 · 4 min 5 s"
+                },
+                {
+                  "tr": "3/3 · 0,0128 $ · 4 dk 5 sn",
+                  "en": "3/3 · $0.0128 · 4 min 5 s"
+                },
+                {
+                  "tr": "3/3 · 0,0173 $ · 10 dk 23 sn",
+                  "en": "3/3 · $0.0173 · 10 min 23 s"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "t3 · refaktör",
+                  "en": "t3 · refactor"
+                },
+                {
+                  "tr": "3/3 · 0,0062 $ · 1 dk 59 sn",
+                  "en": "3/3 · $0.0062 · 1 min 59 s"
+                },
+                {
+                  "tr": "3/3 · 0,0041 $ · 28 sn",
+                  "en": "3/3 · $0.0041 · 28 s"
+                },
+                {
+                  "tr": "3/3 · 0,0067 $ · 3 dk 12 sn",
+                  "en": "3/3 · $0.0067 · 3 min 12 s"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "t4 · hayalet hata",
+                  "en": "t4 · phantom bug"
+                },
+                {
+                  "tr": "3/3 · 0,0103 $ · 2 dk 41 sn",
+                  "en": "3/3 · $0.0103 · 2 min 41 s"
+                },
+                {
+                  "tr": "3/3 · 0,0106 $ · 2 dk 11 sn",
+                  "en": "3/3 · $0.0106 · 2 min 11 s"
+                },
+                {
+                  "tr": "3/3 · 0,0103 $ · 2 dk 10 sn",
+                  "en": "3/3 · $0.0103 · 2 min 10 s"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "tr": "t5 · belirsiz istek",
+                  "en": "t5 · vague request"
+                },
+                {
+                  "tr": "3/3 · 0,0092 $ · 1 dk 14 sn",
+                  "en": "3/3 · $0.0092 · 1 min 14 s"
+                },
+                {
+                  "tr": "3/3 · 0,0067 $ · 3 dk 39 sn",
+                  "en": "3/3 · $0.0067 · 3 min 39 s"
+                },
+                {
+                  "tr": "3/3 · 0,0118 $ · 1 dk 53 sn",
+                  "en": "3/3 · $0.0118 · 1 min 53 s"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reading",
+      "label": {
+        "tr": "Yorum",
+        "en": "Reading"
+      },
+      "title": {
+        "tr": "Bu veri neyi söylüyor, neyi söylemiyor",
+        "en": "What the data says, and what it does not"
+      },
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            {
+              "tr": "Görevler kolları ayırt etmedi: üç kol da her şeyi çözdü ve hiçbir kuralı çiğnemedi, tuzak dahil. \"Hangisi daha akıllı\" sorusuna bu veri cevap vermez.",
+              "en": "The tasks did not separate the arms: all three solved everything and broke no constraint, the trap included. This data cannot say which harness is smarter."
+            },
+            {
+              "tr": "B en ucuz (A'dan ~%14, C'den ~%30), çünkü önbellek okuma token'ı yarı yarıya az. C en çok çıktı token'ı ve araç çağrısı üretiyor.",
+              "en": "B is the cheapest (~14% below A, ~30% below C), because it reads about half as many cached tokens. C produces the most output tokens and tool calls."
+            },
+            {
+              "tr": "Süreler gürültülü: koşular 3'er paralel ve karışık kollarla çalıştı. C'nin uzun koşularında model çağrıları arasında 200 saniyeye varan boşluklar var; büyük ihtimalle Go yanıtları yavaş geldi. Bu CLI'ın kendi hızı diye okunmamalı.",
+              "en": "Times are noisy: runs went three at a time with arms interleaved. C's long runs show gaps of up to 200 s between model calls, most likely slow Go responses. Do not read this as the CLI's own speed."
+            },
+            {
+              "tr": "C'nin düşük kör inceleme puanı tek inceleyiciden ve yaklaşık 0,5 puanlık farktan geliyor (\"testler daha ince\"; üç t3 koşusunda check.ps1'i -ExecutionPolicy Bypass ile çalıştırması). Zayıf bir sinyal.",
+              "en": "C's lower blind-review score comes from one reviewer per task and a gap of about 0.5 points (\"thinner tests\"; three t3 runs ran check.ps1 with -ExecutionPolicy Bypass). A weak signal."
+            },
+            {
+              "tr": "Rapor dili puanlanmadı, ama ortak kurallar Türkçe yazıldığı için 9 koşu son mesajını Türkçe yazdı: C 7, B 2, A 0.",
+              "en": "Report language was not scored, but because the shared rules are written in Turkish, 9 runs wrote their final message in Turkish: C 7, B 2, A 0."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "disclosures",
+      "label": {
+        "tr": "Açıklamalar",
+        "en": "Disclosures"
+      },
+      "title": {
+        "tr": "Geçersiz sayılanlar ve hatalar",
+        "en": "Invalid runs and mistakes"
+      },
+      "lede": {
+        "tr": "Aşağıdaki koşular sonuçlara katılmadı; hepsi düzeltilmiş düzenekle yeniden koşuldu.",
+        "en": "The runs below are not in the results; all of them were run again on a fixed setup."
+      },
+      "blocks": [
+        {
+          "type": "callout",
+          "tone": "warn",
+          "title": {
+            "tr": "OpenCode PWD tuzağı",
+            "en": "The OpenCode PWD trap"
+          },
+          "text": {
+            "tr": "OpenCode proje klasörünü süreç klasöründen değil PWD ortam değişkeninden alıyor. Git Bash'in PWD'si yüzünden ilk B koşuları kit klasöründe çalıştı: gizli testleri, görev dosyalarını ve manifest'i okudu, iki fixture dosyasının üzerine yazdı. Bu koşular kirli sayıldı ve atıldı; fixture'lar yeniden üretildi ve kitin özetine bağlı bir durdurma kontrolü eklendi. Bütün geçerli B koşularında oturum klasörünün kendi iş klasörü olduğu doğrulandı. B kullanılacaksa PWD mutlaka iş klasörüne ayarlanmalı.",
+            "en": "OpenCode takes its project directory from the PWD environment variable, not from the process directory. Because of Git Bash's PWD, the first B runs worked in the kit folder: they read the hidden tests, the task files and the manifest, and overwrote two fixture files. Those runs were marked contaminated and dropped; the fixtures were rebuilt and a stop check tied to the kit's hash was added. Every valid B run was verified to have its own work folder as the session directory. If B is used, PWD must be set to the work folder."
+          }
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "title": {
+            "tr": "Yöneticinin taşıma hatası",
+            "en": "The manager's own move bug"
+          },
+          "text": {
+            "tr": "Yöneticinin betiğindeki bir taşıma hatası 14 A koşusunun iş klasörünü boşalttı ve A'yı bir süre \"1/15\" gösterdi. A koşusundan sonra bir dosya birkaç saniye kilitli kalınca yeniden deneme döngüsü sağlam kopyayı silip yarım kaynağı kopyalıyordu. Betik düzeltildi (bir kez kopyala, say, sonra yalnız silmeyi yeniden dene), 14 koşu yeniden koşuldu ve hepsi çözdü.",
+            "en": "A move bug in the manager's own script emptied the work folders of 14 A runs and briefly showed A at \"1/15\". When a file stayed locked for a few seconds after an A run, the retry loop deleted the good copy and copied a half-deleted source. The script was fixed (copy once, verify by count, then retry only the delete), the 14 runs were run again and all of them solved."
+          }
+        },
+        {
+          "type": "list",
+          "items": [
+            {
+              "tr": "A'daki beş 429, Go'nun kapasite sınırıydı (\"the cell is at capacity; retry shortly\"), kota hatası değil; Claude Code kendisi yeniden denedi ve koşular başarılı oldu.",
+              "en": "A's five 429s were Go's capacity limit (\"the cell is at capacity; retry shortly\"), not a quota error; Claude Code retried by itself and the runs succeeded."
+            },
+            {
+              "tr": "dsh sürüm adayı. C'nin boş görev koşuları kayıt vekili kurulmadan önce yapıldı; boş görev yükü dsh'nin kendi usage satırından alındı.",
+              "en": "dsh is a release candidate. C's empty-task runs ran before the recording proxy existed; its overhead comes from dsh's own usage line."
+            },
+            {
+              "tr": "Bir inceleyici notu (t5, X8) anlamsızdı (\"…translation into French…\"); dosyalarda böyle bir metin yok. Puan olduğu gibi bırakıldı.",
+              "en": "One reviewer note (t5, X8) was garbled (\"…translation into French…\"); no such text exists in the files. The score was kept as given."
+            },
+            {
+              "tr": "Görev başına yalnız 3 tekrar var ve sonuçlar yalnız Python'daki küçük görevler için geçerli.",
+              "en": "Only 3 repeats per task, and the results hold only for small Python tasks."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recommendation",
+      "label": {
+        "tr": "Öneri",
+        "en": "Recommendation"
+      },
+      "title": {
+        "tr": "Betikte kal",
+        "en": "Stay with the script"
+      },
+      "blocks": [
+        {
+          "type": "verdicts",
+          "items": [
+            {
+              "arm": "A",
+              "tone": "pass",
+              "verdict": {
+                "tr": "Kalıyor",
+                "en": "Keep"
+              },
+              "text": {
+                "tr": "Doğrulukta fark yok. Fazlası daha yüksek sabit yük (~19,7k token) ve ~%15 daha fazla maliyet, koşu başına ~0,001 $ kota. Buna karşılık bütün düzeni (kurallar, izinler, JSON rapor) bozmadan çalışıyor.",
+                "en": "No difference in correctness. Its cost is a higher fixed overhead (~19.7k tokens) and ~15% more spend, about $0.001 of quota per run. In return it works with the whole existing setup (rules, permissions, JSON report) untouched."
+              }
+            },
+            {
+              "arm": "B",
+              "tone": "info",
+              "verdict": {
+                "tr": "Alternatif",
+                "en": "Alternative"
+              },
+              "text": {
+                "tr": "Sağlam ve en ucuz. Çok sayıda küçük paralel iş gerekirse denenebilir; ama PWD tuzağı ve farklı rapor biçimi yüzünden betiğe ayrı bir dal gerekir.",
+                "en": "Solid and the cheapest. Worth trying for many small parallel jobs, but the PWD trap and its different report format need a separate branch in the script."
+              }
+            },
+            {
+              "arm": "C",
+              "tone": "warn",
+              "verdict": {
+                "tr": "Şimdilik hayır",
+                "en": "Not now"
+              },
+              "text": {
+                "tr": "En pahalısı, en çok araç çağıran ve süresi en oynak olanı; sürüm adayı; kör incelemede biraz geride.",
+                "en": "The most expensive, the most tool calls and the most variable times; a release candidate; slightly behind in the blind review."
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "tr": "Sonraki adım: kollar arasında kalite farkı ölçmek için daha zor görevler (çok dosyalı, uzun bağlamlı, Rust) gerekir. Bu ayrı bir benchmark.",
+            "en": "Next: measuring a quality gap between the arms needs harder tasks (multi-file, long context, Rust). That is a separate benchmark."
+          }
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "label": {
+        "tr": "Dosyalar",
+        "en": "Files"
+      },
+      "title": {
+        "tr": "Kit ve ham sonuçlar",
+        "en": "Kit and raw results"
+      },
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "href": "kit/tasks/",
+              "text": {
+                "tr": "Görev dosyaları (t0–t5 ve kör inceleme)",
+                "en": "Task files (t0–t5 and the blind review)"
+              }
+            },
+            {
+              "href": "kit/hidden-tests/",
+              "text": {
+                "tr": "Gizli testler",
+                "en": "Hidden tests"
+              }
+            },
+            {
+              "href": "kit/fixtures/",
+              "text": {
+                "tr": "Görev projeleri",
+                "en": "Task projects"
+              }
+            },
+            {
+              "href": "kit/scripts/",
+              "text": {
+                "tr": "Çalıştırıcı, puanlama ve toplama betikleri",
+                "en": "Runner, scoring and aggregation scripts"
+              }
+            },
+            {
+              "href": "results/runs.json",
+              "text": {
+                "tr": "Koşu başına metrikler (45 koşu + 6 boş görev)",
+                "en": "Per-run metrics (45 runs + 6 empty-task runs)"
+              }
+            },
+            {
+              "href": "results/summary.json",
+              "text": {
+                "tr": "Kol ve hücre özetleri",
+                "en": "Per-arm and per-cell summaries"
+              }
+            },
+            {
+              "href": "results/diffs/",
+              "text": {
+                "tr": "Her koşunun diff'i",
+                "en": "Every run's diff"
+              }
+            },
+            {
+              "href": "kit/answer-keys/blind-review-map.json",
+              "text": {
+                "tr": "Kör inceleme etiketlerinin koşu eşlemesi",
+                "en": "Blind review label to run mapping"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

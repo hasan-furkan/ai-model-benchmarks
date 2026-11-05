@@ -1,0 +1,150 @@
+--- a/report.py
++++ b/report.py
+@@ -1,6 +1,23 @@
+ """Weekly revenue report."""
+ import csv
+-from datetime import datetime, timedelta
++from datetime import datetime, timedelta, timezone
++
++
++def _utc_date(value):
++    """Return the date of an ISO 8601 timestamp in UTC.
++
++    Timestamps without an offset are interpreted as UTC.  Reporting is always
++    done on the UTC calendar, regardless of the offset carried by the input.
++    """
++    moment = datetime.fromisoformat(value)
++    if moment.tzinfo is None:
++        return moment.date()
++    return moment.astimezone(timezone.utc).date()
++
++
++def _week_start(day):
++    """Return the Monday that starts ``day``'s reporting week."""
++    return day - timedelta(days=day.weekday())
+ 
+ 
+ def weekly_totals(rows):
+@@ -8,12 +25,27 @@
+ 
+     Returns {week_start date: total cents}.
+     """
++    rows = list(rows)
++    rows_by_id = {}
++    for row in rows:
++        rows_by_id.setdefault(row["id"], row)
++
+     totals = {}
+     for row in rows:
+-        day = datetime.fromisoformat(row["created_at"]).date()
+-        # Weeks start on Sunday.
+-        week = day - timedelta(days=(day.weekday() + 1) % 7)
+-        amount = abs(int(row["amount_cents"]))
++        if row["status"] == "voided":
++            continue
++
++        refund_of = (row.get("refund_of") or "").strip()
++        original = rows_by_id.get(refund_of) if refund_of else None
++        if original is not None:
++            # A refund belongs to the week of the original sale.
++            day = _utc_date(original["created_at"])
++        else:
++            # An unmatched refund belongs to its own week.
++            day = _utc_date(row["created_at"])
++
++        week = _week_start(day)
++        amount = int(row["amount_cents"])
+         totals[week] = totals.get(week, 0) + amount
+     return totals
+ 
+--- a/test_report.py
++++ b/test_report.py
+@@ -1,7 +1,18 @@
+ import unittest
+ from datetime import date
++from pathlib import Path
+ 
+-from report import weekly_totals
++from report import load, weekly_totals
++
++
++def row(row_id, status, amount_cents, created_at, refund_of=""):
++    return {
++        "id": row_id,
++        "status": status,
++        "amount_cents": str(amount_cents),
++        "created_at": created_at,
++        "refund_of": refund_of,
++    }
+ 
+ 
+ class ReportTest(unittest.TestCase):
+@@ -11,6 +22,68 @@
+         self.assertEqual(len(weekly_totals(rows)), 1)
+         self.assertIsInstance(next(iter(weekly_totals(rows))), date)
+ 
++    def test_week_starts_on_monday(self):
++        rows = [
++            row("monday", "paid", 100, "2026-03-02T00:00:00+00:00"),
++            row("sunday", "paid", 200, "2026-03-08T23:59:59+00:00"),
++            row("next_monday", "paid", 300, "2026-03-09T00:00:00+00:00"),
++        ]
++        totals = weekly_totals(rows)
++        self.assertEqual(totals[date(2026, 3, 2)], 300)
++        self.assertEqual(totals[date(2026, 3, 9)], 300)
++
++    def test_timestamps_are_reported_in_utc(self):
++        rows = [
++            # This is Sunday in UTC, so it belongs to the previous Monday's week.
++            row("sunday_utc", "paid", 100, "2026-03-02T00:30:00+02:00"),
++            # This is Monday in UTC even though the local date is Sunday.
++            row("monday_utc", "paid", 200, "2026-03-01T23:30:00-05:00"),
++        ]
++        totals = weekly_totals(rows)
++        self.assertEqual(totals, {
++            date(2026, 2, 23): 100,
++            date(2026, 3, 2): 200,
++        })
++
++    def test_voided_rows_never_count(self):
++        rows = [
++            row("paid", "paid", 500, "2026-03-03T10:00:00+00:00"),
++            row("voided", "voided", 700, "2026-03-03T11:00:00+00:00"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): 500})
++
++    def test_refund_reduces_week_of_original_sale(self):
++        rows = [
++            row("sale", "paid", 1000, "2026-03-02T10:00:00+00:00"),
++            row("refund", "paid", -250, "2026-03-10T09:00:00+00:00", "sale"),
++        ]
++        totals = weekly_totals(rows)
++        self.assertEqual(totals, {date(2026, 3, 2): 750})
++        self.assertNotIn(date(2026, 3, 9), totals)
++
++    def test_refund_without_original_reduces_its_own_week(self):
++        rows = [
++            row("orphan", "paid", -400, "2026-03-10T09:00:00+00:00", "missing"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 9): -400})
++
++    def test_negative_amounts_are_not_made_positive(self):
++        rows = [
++            row("adjustment", "paid", -125, "2026-03-04T10:00:00+00:00"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): -125})
++
++    def test_voided_refund_does_not_count(self):
++        rows = [
++            row("sale", "paid", 1000, "2026-03-02T10:00:00+00:00"),
++            row("refund", "voided", -250, "2026-03-10T09:00:00+00:00", "sale"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): 1000})
++
++    def test_sample_data(self):
++        sample = Path(__file__).parent / "data" / "sample.csv"
++        self.assertEqual(weekly_totals(load(sample)), {date(2026, 3, 2): 1300})
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

@@ -1,0 +1,67 @@
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,20 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """Stand-in for the production cache-backed mapping: every access takes time."""
++
++    def __getitem__(self, key):
++        time.sleep(0.001)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(0.001)
++        super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -29,5 +43,43 @@
+             self.svc.reserve("pear", 1)
+ 
+ 
++class ConcurrentInventoryTest(unittest.TestCase):
++    """One service instance is shared by many threads; the last unit must go to exactly one of them."""
++
++    def _race(self, svc, attempts, qty):
++        barrier = threading.Barrier(attempts)
++        outcomes = []
++        outcomes_lock = threading.Lock()
++
++        def attempt():
++            barrier.wait(timeout=5)
++            granted = svc.reserve("apple", qty)
++            with outcomes_lock:
++                outcomes.append(granted)
++
++        threads = [threading.Thread(target=attempt) for _ in range(attempts)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++        return outcomes
++
++    def test_single_last_unit_is_granted_exactly_once(self):
++        svc = InventoryService(SlowStore({"apple": 1}))
++
++        outcomes = self._race(svc, attempts=16, qty=1)
++
++        self.assertEqual(outcomes.count(True), 1)
++        self.assertEqual(svc.available("apple"), 0)
++
++    def test_concurrent_multiple_units_never_oversell(self):
++        svc = InventoryService(SlowStore({"apple": 10}))
++
++        outcomes = self._race(svc, attempts=12, qty=2)
++
++        self.assertEqual(outcomes.count(True), 5)
++        self.assertEqual(svc.available("apple"), 0)
++
++
+ if __name__ == "__main__":
+     unittest.main()

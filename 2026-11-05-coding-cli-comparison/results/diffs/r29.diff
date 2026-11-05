@@ -1,0 +1,169 @@
+--- a/report.py
++++ b/report.py
+@@ -1,6 +1,27 @@
+ """Weekly revenue report."""
+ import csv
+-from datetime import datetime, timedelta
++from datetime import datetime, timedelta, timezone
++
++
++def _utc_date(value):
++    """Return the calendar date in UTC, treating a naive timestamp as UTC."""
++    moment = datetime.fromisoformat(value.strip())
++    if moment.tzinfo is None:
++        moment = moment.replace(tzinfo=timezone.utc)
++    else:
++        moment = moment.astimezone(timezone.utc)
++    return moment.date()
++
++
++def _week_start(value):
++    """Return the Monday that starts the UTC reporting week for a timestamp."""
++    day = _utc_date(value)
++    return day - timedelta(days=day.weekday())
++
++
++def _id_key(value):
++    """Normalize an id so CSV strings and direct values can be matched."""
++    return "" if value is None else str(value).strip()
+ 
+ 
+ def weekly_totals(rows):
+@@ -8,12 +29,25 @@
+ 
+     Returns {week_start date: total cents}.
+     """
++    rows = list(rows)
++    by_id = {}
++    for row in rows:
++        by_id.setdefault(_id_key(row.get("id")), row)
++
+     totals = {}
+     for row in rows:
+-        day = datetime.fromisoformat(row["created_at"]).date()
+-        # Weeks start on Sunday.
+-        week = day - timedelta(days=(day.weekday() + 1) % 7)
+-        amount = abs(int(row["amount_cents"]))
++        if str(row.get("status", "")).strip().lower() == "voided":
++            continue
++
++        amount = int(row["amount_cents"])
++        target = row
++        refund_of = _id_key(row.get("refund_of"))
++        if refund_of:
++            original = by_id.get(refund_of)
++            if original is not None:
++                target = original
++
++        week = _week_start(target["created_at"])
+         totals[week] = totals.get(week, 0) + amount
+     return totals
+ 
+--- a/test_report.py
++++ b/test_report.py
+@@ -1,15 +1,100 @@
++import os
++import tempfile
+ import unittest
+ from datetime import date
+ 
+-from report import weekly_totals
++from report import load, weekly_totals, write_csv
++
++
++def make_row(row_id, amount_cents, created_at, status="paid", refund_of=""):
++    return {
++        "id": row_id,
++        "status": status,
++        "amount_cents": str(amount_cents),
++        "created_at": created_at,
++        "refund_of": refund_of,
++    }
+ 
+ 
+ class ReportTest(unittest.TestCase):
+     def test_single_sale_midweek(self):
+-        rows = [{"id": "1", "status": "paid", "amount_cents": "1000", "created_at": "2026-03-04T10:00:00+00:00", "refund_of": ""}]
+-        self.assertEqual(sum(weekly_totals(rows).values()), 1000)
+-        self.assertEqual(len(weekly_totals(rows)), 1)
+-        self.assertIsInstance(next(iter(weekly_totals(rows))), date)
++        rows = [make_row("1", 1000, "2026-03-04T10:00:00+00:00")]
++        totals = weekly_totals(rows)
++        self.assertEqual(sum(totals.values()), 1000)
++        self.assertEqual(len(totals), 1)
++        self.assertIsInstance(next(iter(totals)), date)
++
++    def test_week_starts_on_monday(self):
++        rows = [
++            make_row("1", 100, "2026-03-08T23:59:59+00:00"),  # Sunday
++            make_row("2", 200, "2026-03-09T00:00:00+00:00"),  # Monday
++        ]
++        self.assertEqual(
++            weekly_totals(rows),
++            {date(2026, 3, 2): 100, date(2026, 3, 9): 200},
++        )
++
++    def test_week_uses_utc_date_not_timestamp_offset(self):
++        rows = [
++            # 2026-03-09 00:30 +02:00 is Sunday 2026-03-08 in UTC.
++            make_row("1", 100, "2026-03-09T00:30:00+02:00"),
++            # 2026-03-08 23:30 -05:00 is Monday 2026-03-09 in UTC.
++            make_row("2", 200, "2026-03-08T23:30:00-05:00"),
++        ]
++        self.assertEqual(
++            weekly_totals(rows),
++            {date(2026, 3, 2): 100, date(2026, 3, 9): 200},
++        )
++
++    def test_voided_rows_never_count(self):
++        rows = [
++            make_row("1", 1000, "2026-03-02T10:00:00+00:00"),
++            make_row("2", 700, "2026-03-03T11:00:00+00:00", status="voided"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): 1000})
++
++    def test_refund_reduces_original_sale_week(self):
++        rows = [
++            make_row("1", 1000, "2026-03-03T10:00:00+00:00"),
++            make_row("2", -200, "2026-03-10T09:00:00+00:00", refund_of="1"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): 800})
++
++    def test_refund_without_original_uses_refund_week(self):
++        rows = [
++            make_row("9", -300, "2026-03-10T09:00:00+00:00", refund_of="missing"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 9): -300})
++
++    def test_refund_of_voided_sale_uses_original_week(self):
++        # Rule 2 excludes the voided sale itself; rule 3 still places the
++        # refund in the week of the original sale, which is present in the data.
++        rows = [
++            make_row("1", 1000, "2026-03-03T10:00:00+00:00", status="voided"),
++            make_row("2", -200, "2026-03-10T09:00:00+00:00", refund_of="1"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): -200})
++
++    def test_refunds_use_signed_amounts(self):
++        rows = [
++            make_row("1", 1000, "2026-03-03T10:00:00+00:00"),
++            make_row("2", -200, "2026-03-04T09:00:00+00:00", refund_of="1"),
++            make_row("3", -50, "2026-03-05T09:00:00+00:00", refund_of="1"),
++        ]
++        self.assertEqual(weekly_totals(rows), {date(2026, 3, 2): 750})
++
++    def test_write_csv_and_load_round_trip(self):
++        totals = {date(2026, 3, 9): -300, date(2026, 3, 2): 800}
++        with tempfile.TemporaryDirectory() as tmp:
++            path = os.path.join(tmp, "totals.csv")
++            write_csv(totals, path)
++            self.assertEqual(
++                load(path),
++                [
++                    {"week_start": "2026-03-02", "total_cents": "800"},
++                    {"week_start": "2026-03-09", "total_cents": "-300"},
++                ],
++            )
+ 
+ 
+ if __name__ == "__main__":

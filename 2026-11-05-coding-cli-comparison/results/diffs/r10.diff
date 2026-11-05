@@ -1,0 +1,61 @@
+--- a/test_inventory.py
++++ b/test_inventory.py
+@@ -1,6 +1,20 @@
++import threading
++import time
+ import unittest
+ 
+ from inventory import InventoryService
++
++
++class SlowStore(dict):
++    """Dict that mimics the slow, cache-backed production mapping."""
++
++    def __getitem__(self, key):
++        time.sleep(0.001)
++        return super().__getitem__(key)
++
++    def __setitem__(self, key, value):
++        time.sleep(0.001)
++        return super().__setitem__(key, value)
+ 
+ 
+ class InventoryTest(unittest.TestCase):
+@@ -29,5 +43,37 @@
+             self.svc.reserve("pear", 1)
+ 
+ 
++class InventoryConcurrencyTest(unittest.TestCase):
++    def test_last_units_are_not_oversold(self):
++        """Concurrent buyers must never get more units than were in stock.
++
++        This is a regression test for the reported flash-sale oversell.  The
++        slow store widens the read-modify-write window; without the service's
++        lock, several threads read the same value and all reserve successfully.
++        """
++        stock = 10
++        workers = 40
++        svc = InventoryService(SlowStore({"apple": stock}))
++        barrier = threading.Barrier(workers)
++        results = []
++        results_lock = threading.Lock()
++
++        def buy_one():
++            barrier.wait()
++            granted = svc.reserve("apple", 1)
++            with results_lock:
++                results.append(granted)
++
++        threads = [threading.Thread(target=buy_one) for _ in range(workers)]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join()
++
++        self.assertEqual(len(results), workers)
++        self.assertEqual(results.count(True), stock)
++        self.assertEqual(svc.available("apple"), 0)
++
++
+ if __name__ == "__main__":
+     unittest.main()
