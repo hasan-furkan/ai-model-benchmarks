@@ -6,13 +6,13 @@
     "en": "DeepSeek V4.1 Flash: high vs max reasoning effort"
   },
   "decision": {
-    "tr": "Kodlama işçilerinde varsayılan seviye high olarak kalıyor (HFK kararı, 2026-10-28).",
-    "en": "high stays the default effort for coding workers (decision by HFK, 2026-10-28)."
+    "tr": "Bu sonuçlara göre şu karar verildi: kodlama işçilerinde varsayılan seviye high olarak kalıyor.",
+    "en": "Based on these results, the decision is: high stays the default effort for coding workers."
   },
   "people": {
     "owner": {
-      "tr": "Hasan Furkan (HFK) — benchmark'ı istedi ve son kararı verdi",
-      "en": "Hasan Furkan (HFK) — asked for the benchmark and made the final decision"
+      "tr": "Hasan Furkan — benchmark'ı istedi",
+      "en": "Hasan Furkan — asked for the benchmark"
     },
     "manager": {
       "tr": "Claude Opus 5.5 (Anthropic), Claude Code içinde — testleri tasarladı, gizli testleri ve cevap anahtarlarını yazdı, bütün koşuları yürüttü, her kalite kapısını kendisi yeniden çalıştırdı ve her işçi iddiasını kaydetmeden önce doğruladı",

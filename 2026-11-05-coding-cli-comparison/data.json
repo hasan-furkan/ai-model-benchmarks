@@ -80,8 +80,8 @@
     }
   ],
   "decision": {
-    "tr": "İşçilerde kendi betiğimiz (deepseek-agent.ps1) kullanılmaya devam ediyor (HFK kararı, 2026-11-05).",
-    "en": "Coding workers keep using our own script, deepseek-agent.ps1 (decision by HFK, 2026-11-05)."
+    "tr": "Bu sonuçlara göre şu karar verildi: işçilerde kendi betiğimiz (deepseek-agent.ps1) kullanılmaya devam ediyor.",
+    "en": "Based on these results, the decision is: coding workers keep using our own script, deepseek-agent.ps1."
   },
   "sections": [
     {
