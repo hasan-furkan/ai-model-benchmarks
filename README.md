@@ -111,6 +111,23 @@ scripts/
 
 The results sit next to the kit in `results/`: `runs.json` (per-run metrics, 45 runs plus six empty-task runs), `summary.json`, `blind-review-t1.json` ... `t5.json` and `diffs/r01.diff` ... `r45.diff`. The workers' final messages are not published: some of them are in Turkish, because the shared rules text they received is Turkish.
 
+### The kit of the four-model report (2026-11-09)
+
+```
+bench_config.py                      paths, arms, tasks, prompts, hashing, isolation helpers
+events.py                            OpenCode event parsing, session DB fallback, outside-path scan
+score.py                             gate and hidden-test execution, auto_keyword checks
+run_bench.py                         the runner: copies a fixture, starts an arm, records usage
+aggregate.py                         per-arm and per-cell summaries
+cli_constraints.py                   constraint checks for the agent-cli fixtures
+scoring.json                         gate and hidden-test commands
+shim/cargo.cmd                       forwards cargo to WSL (Smart App Control blocks it on Windows)
+shim/rust-gate.cmd                   fmt, strict clippy and tests inside WSL
+README.md                            how the kit works and how to run it
+```
+
+Unlike the older kits, this public folder does not republish the task texts, hidden tests and fixtures; `scoring.json` names them by relative path and the kit README explains the harness. Absolute paths in the scripts are replaced by the `<bench-root>` placeholder. The results sit next to the kit in `results/runs.json`: one filtered record per completed run (178 rows), with the extended round marked in the file's note.
+
 ## Adding a new report
 
 1. Create a folder named `YYYY-MM-DD-<short-slug>` next to the existing report.

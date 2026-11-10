@@ -1,0 +1,104 @@
+{
+  "_comment": [
+    "Scoring commands are data, not code: edit this file when the machine's toolchain changes.",
+    "Placeholders: {dir} = Windows run folder, {shim} = kit/shim, {wsl_dir_q} = single-quoted WSL path,",
+    "{hidden_dest} = path of the hidden test inside the run folder.",
+    "Rust runs only inside WSL (Smart App Control blocks unsigned cargo binaries on Windows);",
+    "every cargo call goes through kit/shim/cargo.cmd -> wsl.exe -d focus-dev.",
+    "Each run is executed with cwd = run folder; hidden tests run after the project gate.",
+    "Tasks without hidden_src (agent-lma) are judged by gate_cmd alone."
+  ],
+  "python_cmd": "py -3",
+  "tasks": {
+    "api": {
+      "hidden_src": "_kit/gizli/test_api_gizli.py",
+      "hidden_dest": "test_mb_hidden_api.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_api"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "stok": {
+      "hidden_src": "_kit/gizli/test_stok_gizli.py",
+      "hidden_dest": "test_mb_hidden_stok.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_stok"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "rc": {
+      "hidden_src": "_kit/gizli/rc_gizli.rs",
+      "hidden_dest": "tests/mb_hidden_rc.rs",
+      "hidden_cmd": ["cmd", "/c", "{shim}\\cargo.cmd", "test", "--test", "mb_hidden_rc", "--", "--nocapture"],
+      "gate_cmd": ["cmd", "/c", "{shim}\\rust-gate.cmd"],
+      "gate_ok": "",
+      "parser": "cargo"
+    },
+    "rand": {
+      "hidden_src": "_kit/gizli/rand_gizli.rs",
+      "hidden_dest": "tests/mb_hidden_rand.rs",
+      "hidden_cmd": ["cmd", "/c", "{shim}\\cargo.cmd", "test", "--test", "mb_hidden_rand", "--", "--nocapture"],
+      "gate_cmd": ["cmd", "/c", "{shim}\\rust-gate.cmd"],
+      "gate_ok": "",
+      "parser": "cargo"
+    },
+    "t1": {
+      "hidden_src": "cli-2026-11-05/kit/hidden/t1_hidden.py",
+      "hidden_dest": "test_mb_hidden_t1.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_t1"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "t2": {
+      "hidden_src": "cli-2026-11-05/kit/hidden/t2_hidden.py",
+      "hidden_dest": "test_mb_hidden_t2.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_t2"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "t3": {
+      "hidden_src": "cli-2026-11-05/kit/hidden/t3_hidden.py",
+      "hidden_dest": "test_mb_hidden_t3.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_t3"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "t4": {
+      "hidden_src": "cli-2026-11-05/kit/hidden/t4_hidden.py",
+      "hidden_dest": "test_mb_hidden_t4.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_t4"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "t5": {
+      "hidden_src": "cli-2026-11-05/kit/hidden/t5_hidden.py",
+      "hidden_dest": "test_mb_hidden_t5.py",
+      "hidden_cmd": ["py", "-3", "-m", "unittest", "-v", "test_mb_hidden_t5"],
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "lma1": {
+      "hidden_src": null,
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "scripts/check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "lma2": {
+      "hidden_src": null,
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "scripts/check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    },
+    "lmaghost": {
+      "hidden_src": null,
+      "gate_cmd": ["powershell", "-NoProfile", "-File", "scripts/check.ps1"],
+      "gate_ok": "CHECK PASSED",
+      "parser": "unittest"
+    }
+  }
+}

@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-11-09-four-model-comparison",
+    "date": "2026-11-09",
+    "title": {
+      "tr": "OpenCode Go'da dört model: GPT-6 Luna, DeepSeek V4.1 Flash, MiMo-V2.6-Flash, MiniMax M3.1 Flash",
+      "en": "Four models on OpenCode Go: GPT-6 Luna, DeepSeek V4.1 Flash, MiMo-V2.6-Flash, MiniMax M3.1 Flash"
+    },
+    "summary": {
+      "tr": "Tek bir model iki turda da açık ara kazanmıyor: DeepSeek V4.1 Flash ve GPT-6 Luna kalitede önde ve ucuz, aralarındaki fark az tekrarın gürültüsü içinde. Genişletilmiş turda MiniMax M3.1 Flash en pahalı ve en yavaşlardan biri; MiMo-V2.6-Flash gerçek proje işinde geride kalıyor.",
+      "en": "No single model wins both rounds outright: DeepSeek V4.1 Flash and GPT-6 Luna lead on quality and cost, and the gap between them sits inside the noise of few repetitions. In the extended round MiniMax M3.1 Flash is the most expensive and among the slowest; MiMo-V2.6-Flash falls behind on real project work."
+    },
+    "path": "2026-11-09-four-model-comparison/"
+  },
+  {
     "id": "2026-11-05-coding-cli-comparison",
     "date": "2026-11-05",
     "title": {

@@ -111,6 +111,23 @@ scripts/
 
 Sonuçlar kitin yanında, `results/` içinde: `runs.json` (koşu başına metrikler, 45 koşu ve altı boş görev koşusu), `summary.json`, `blind-review-t1.json` ... `t5.json` ve `diffs/r01.diff` ... `r45.diff`. İşçilerin son mesajları yayınlanmadı: aldıkları ortak kural metni Türkçe olduğu için bir kısmı Türkçe.
 
+### Dört model raporunun kiti (2026-11-09)
+
+```
+bench_config.py                      yollar, kollar, görevler, istemler, karma, yalıtım yardımcıları
+events.py                            OpenCode olay ayrıştırma, oturum veritabanı yedeği, dış yol taraması
+score.py                             kapı ve gizli test çalıştırma, auto_keyword kontrolleri
+run_bench.py                         çalıştırıcı: fixture'ı kopyalar, kolu başlatır, kullanımı kaydeder
+aggregate.py                         kol ve hücre özetleri
+cli_constraints.py                   agent-cli fixture'ları için kısıt kontrolleri
+scoring.json                         kapı ve gizli test komutları
+shim/cargo.cmd                       cargo'yu WSL'e iletir (Smart App Control Windows'ta engelliyor)
+shim/rust-gate.cmd                   WSL içinde fmt, katı clippy ve testler
+README.md                            kitin nasıl çalıştığı ve nasıl koşulacağı
+```
+
+Eski kitlerden farklı olarak bu herkese açık klasör görev metinlerini, gizli testleri ve fixture'ları yeniden yayınlamaz; `scoring.json` bunları göreli yolla adlandırır ve kit README'si düzeneği anlatır. Betiklerdeki mutlak yollar `<bench-root>` yer tutucusuyla değiştirildi. Sonuçlar kitin yanında, `results/runs.json` içinde: tamamlanan her koşu için bir filtrelenmiş kayıt (178 satır); genişletilmiş tur dosyanın notunda belirtilir.
+
 ## Yeni rapor ekleme
 
 1. Mevcut raporun yanında `YYYY-MM-DD-<kısa-ad>` adında bir klasör aç.
