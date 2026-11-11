@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-11-11-gemini-agy-comparison",
+    "date": "2026-11-11",
+    "title": {
+      "tr": "Antigravity CLI'da Gemini 3.8 Flash ve Gemini 4 Argon, DeepSeek V4.1 Flash'a karşı",
+      "en": "Gemini 3.8 Flash and Gemini 4 Argon on the Antigravity CLI against DeepSeek V4.1 Flash"
+    },
+    "summary": {
+      "tr": "Flash low birinci turda 63/63 aldı ve zor turda araçlı işlerde güçlü, araçsız akıl yürütmede zayıf; dört kol zor turda aynı %77 ortalamaya farklı yollardan çıktı. Üç Gemini kolunda da klasör dışı okuma görüldü, hook yamalandı.",
+      "en": "Flash low scored 63/63 in round 1 and is strong on tool tasks but weak on tool-free reasoning in the hard round; all four arms reached the same 77% average by different routes. Outside-folder reads were seen in all three Gemini arms, and the hook was patched."
+    },
+    "path": "2026-11-11-gemini-agy-comparison/"
+  },
+  {
     "id": "2026-11-09-four-model-comparison",
     "date": "2026-11-09",
     "title": {
